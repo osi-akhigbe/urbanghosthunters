@@ -1,0 +1,27 @@
+.DS_Store
+/.build
+/Packages
+xcuserdata/
+DerivedData/
+.swiftpm/configuration/registries.json
+.swiftpm/xcode/package.xcworkspace/contents.xcworkspacedata
+.netrc
+
+# Swift Package Manager / Xcode
+.swiftpm/xcode/
+.swiftpm/workspace/
+*.xcodeproj/
+*.xcworkspace/
+*.xcuserstate
+
+# Logs and debug artifacts
+*.log
+*.dSYM/
+
+# Editor/IDE
+.vscode/
+.idea/
+
+# Environment/secrets (keep local only)
+.env
+.env.*
