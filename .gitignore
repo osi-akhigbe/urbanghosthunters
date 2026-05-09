@@ -25,3 +25,4 @@ DerivedData/
 # Environment/secrets (keep local only)
 .env
 .env.*
+!.env.example
