@@ -10,9 +10,18 @@ DerivedData/
 # Swift Package Manager / Xcode
 .swiftpm/xcode/
 .swiftpm/workspace/
-*.xcodeproj/
 *.xcworkspace/
 *.xcuserstate
+
+# iOS Xcode project should be tracked (monorepo)
+!ios/*.xcodeproj/
+!ios/*.xcworkspace/
+
+# Xcode per-user junk (ignore everywhere, including ios/)
+**/*.xcodeproj/project.xcworkspace/
+**/*.xcodeproj/xcuserdata/
+**/*.xcworkspace/xcuserdata/
+**/*.xcuserdatad/
 
 # Logs and debug artifacts
 *.log
@@ -26,3 +35,7 @@ DerivedData/
 .env
 .env.*
 !.env.example
+
+# Local iOS secrets (do not commit)
+ios/**/Secrets.plist
+Secrets.plist
