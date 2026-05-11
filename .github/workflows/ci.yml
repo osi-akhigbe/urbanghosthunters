@@ -14,32 +14,49 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  swift:
+  build:
     runs-on: macos-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Swift
-        uses: swift-actions/setup-swift@v2
-        with:
-          swift-version: "6.3"
+      - name: Create Secrets.plist
+        run: |
+          cat > ios/urbanghosthunters/Secrets.plist << PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>SUPABASE_URL</key>
+            <string>${{ secrets.SUPABASE_URL }}</string>
+            <key>SUPABASE_ANON_KEY</key>
+            <string>${{ secrets.SUPABASE_ANON_KEY }}</string>
+          </dict>
+          </plist>
+          PLIST
 
-      - name: Cache SwiftPM
+      - name: Cache DerivedData
         uses: actions/cache@v4
         with:
-          path: |
-            .build
-          key: ${{ runner.os }}-swiftpm-${{ hashFiles('Package.resolved', 'Package.swift') }}
+          path: ~/Library/Developer/Xcode/DerivedData
+          key: ${{ runner.os }}-xcode-${{ hashFiles('ios/**/*.xcodeproj/project.pbxproj') }}
           restore-keys: |
-            ${{ runner.os }}-swiftpm-
-
-      - name: Swift version
-        run: swift --version
+            ${{ runner.os }}-xcode-
 
       - name: Build
-        run: swift build -v
+        run: |
+          xcodebuild build \
+            -project ios/urbanghosthunters.xcodeproj \
+            -scheme urbanghosthunters \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
 
       - name: Test
-        run: swift test -v
-
+        run: |
+          xcodebuild test \
+            -project ios/urbanghosthunters.xcodeproj \
+            -scheme urbanghosthunters \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty || true
