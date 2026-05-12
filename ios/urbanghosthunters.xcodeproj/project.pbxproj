@@ -33,9 +33,22 @@
 		6C2560D72FAF2F3D00364E80 /* urbanghosthuntersUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = urbanghosthuntersUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		6C1EEE3D2FB3510C00848815 /* Exceptions for "urbanghosthunters" folder in "urbanghosthunters" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 6C2560BF2FAF2F3B00364E80 /* urbanghosthunters */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		6C2560C22FAF2F3B00364E80 /* urbanghosthunters */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				6C1EEE3D2FB3510C00848815 /* Exceptions for "urbanghosthunters" folder in "urbanghosthunters" target */,
+			);
 			path = urbanghosthunters;
 			sourceTree = "<group>";
 		};
@@ -414,8 +427,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = urbanghosthunters/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = urbanghosthunters;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Used for the scanner HUD background.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Urban Ghost Hunter needs your location to detect nearby anomalies.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Used to lure ghosts with sound.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -447,8 +464,12 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = urbanghosthunters/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = urbanghosthunters;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Used for the scanner HUD background.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Urban Ghost Hunter needs your location to detect nearby anomalies.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Used to lure ghosts with sound.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
