@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 struct ContentView: View {
     @StateObject private var supa = SupabaseManager.shared

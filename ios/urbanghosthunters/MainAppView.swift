@@ -1,14 +1,17 @@
 import SwiftUI
+import Supabase
 
 struct MainAppView: View {
     var body: some View {
         TabView {
-            MapView()
-                .tabItem {
-                    Label("Map", systemImage: "map.fill")
-                }
+            NavigationStack {
+                MapView()
+            }
+            .tabItem {
+                Label("Map", systemImage: "map.fill")
+            }
 
-            Text("Journal") // placeholder for Sprint 2
+            Text("Journal")
                 .tabItem {
                     Label("Journal", systemImage: "book.fill")
                 }

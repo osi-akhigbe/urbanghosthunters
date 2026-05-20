@@ -1,5 +1,5 @@
 //
-//  SpabaseManager.swift
+//  SupabaseManager.swift
 //  urbanghosthunters
 //
 //  Created by Jarvis Akhigbe on 10/05/2026.
