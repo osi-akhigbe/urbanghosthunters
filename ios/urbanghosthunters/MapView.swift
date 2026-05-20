@@ -9,7 +9,7 @@ import Observation
 import Supabase
 
 // MARK: - Hotspot model
-struct Hotspot: Identifiable, Decodable {
+struct Hotspot: Identifiable, Decodable, Hashable {
     let id: UUID
     let name: String
     let lat: Double
@@ -67,7 +67,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
             return distA < distB
         })
     }
-    
+
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
@@ -89,6 +89,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
 struct MapView: View {
     @State private var vm = MapViewModel()
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var selectedHotspot: Hotspot?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -109,11 +110,19 @@ struct MapView: View {
                 MapCompass()
             }
             .ignoresSafeArea()
+.navigationDestination(item: $selectedHotspot) { hotspot in
+    ScannerView(hotspot: hotspot)
+}
 
             if let nearest = vm.nearestHotspot {
-                NearestAnomalySheet(hotspot: nearest)
-                    .padding()
-            }
+            NearestAnomalySheet(hotspot: nearest)
+            .padding()
+            .contentShape(Rectangle())
+            .onTapGesture
+    {
+            selectedHotspot = nearest
+        }
+}
 
             if let error = vm.errorText {
                 Text(error)
@@ -127,6 +136,7 @@ struct MapView: View {
         .task {
             await vm.fetchHotspots()
         }
+        
     }
 }
 
