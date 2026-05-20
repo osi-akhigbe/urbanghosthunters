@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 @main
 struct urbanghosthuntersApp: App {
@@ -18,6 +19,11 @@ struct urbanghosthuntersApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .onOpenURL { url in
+                    Task {
+                        try? await SupabaseManager.shared.client.auth.session(from: url)
+                    }
+                }
         }
     }
 }

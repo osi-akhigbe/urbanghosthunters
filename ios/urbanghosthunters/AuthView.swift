@@ -12,27 +12,22 @@ import Auth
 struct AuthView: View {
     @StateObject private var supa = SupabaseManager.shared
     @State private var email = ""
-    @State private var otp = ""
-    @State private var isWaitingForOTP = false
+    @State private var password = ""
     @State private var errorText: String?
+    @State private var isLoading = false
 
     var body: some View {
         VStack(spacing: 16) {
-            Text("Auth").font(.title2).bold()
+            Text("Urban Ghost Hunter")
+                .font(.title2).bold()
 
             if let uid = supa.userId {
                 Text("Signed in as:")
                 Text(uid).font(.footnote).textSelection(.enabled)
             } else {
-                Text("Not signed in").foregroundStyle(.secondary)
+                Text("Sign in to continue")
+                    .foregroundStyle(.secondary)
             }
-
-            Divider()
-
-            Button("Continue as Guest") {
-                Task { await signInAnonymously() }
-            }
-            .buttonStyle(.borderedProminent)
 
             Divider()
 
@@ -41,24 +36,25 @@ struct AuthView: View {
                 .keyboardType(.emailAddress)
                 .textFieldStyle(.roundedBorder)
 
-            if isWaitingForOTP {
-                TextField("OTP code", text: $otp)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+            SecureField("Password", text: $password)
+                .textFieldStyle(.roundedBorder)
 
-                Button("Verify OTP") {
-                    Task { await verifyOTP() }
-                }
-                .buttonStyle(.borderedProminent)
-            } else {
-                Button("Send OTP") {
-                    Task { await sendOTP() }
-                }
-                .buttonStyle(.bordered)
+            Button(isLoading ? "Signing in..." : "Sign In") {
+                Task { await signIn() }
             }
+            .buttonStyle(.borderedProminent)
+            .disabled(isLoading)
+
+            Button("Create Account") {
+                Task { await signUp() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(isLoading)
 
             if let errorText {
-                Text(errorText).foregroundStyle(.red).font(.footnote)
+                Text(errorText)
+                    .foregroundStyle(.red)
+                    .font(.footnote)
             }
 
             Spacer()
@@ -67,37 +63,26 @@ struct AuthView: View {
     }
 
     @MainActor
-    private func signInAnonymously() async {
+    private func signIn() async {
+        isLoading = true
+        errorText = nil
         do {
-            errorText = nil
-            _ = try await supa.client.auth.signInAnonymously()
+            _ = try await supa.client.auth.signIn(email: email, password: password)
         } catch {
             errorText = error.localizedDescription
         }
+        isLoading = false
     }
 
     @MainActor
-    private func sendOTP() async {
+    private func signUp() async {
+        isLoading = true
+        errorText = nil
         do {
-            errorText = nil
-            try await supa.client.auth.signInWithOTP(email: email)
-            isWaitingForOTP = true
+            _ = try await supa.client.auth.signUp(email: email, password: password)
         } catch {
             errorText = error.localizedDescription
         }
-    }
-
-    @MainActor
-    private func verifyOTP() async {
-        do {
-            errorText = nil
-            _ = try await supa.client.auth.verifyOTP(
-                email: email,
-                token: otp,
-                type: .email
-            )
-        } catch {
-            errorText = error.localizedDescription
-        }
+        isLoading = false
     }
 }
