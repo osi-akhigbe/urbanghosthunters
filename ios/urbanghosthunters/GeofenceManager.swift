@@ -1,15 +1,8 @@
+import Combine
 import Foundation
 import CoreLocation       // For CLLocationManager, CLLocation, CLRegion
 import UserNotifications  // For local push notifications
 
-// MARK: - Hotspot model
-// Represents a named paranormal location the user can approach
-struct Hotspot: Identifiable {
-    let id = UUID()                            // Unique ID so SwiftUI can iterate
-    let name: String                           // Display name shown in the banner
-    let coordinate: CLLocationCoordinate2D    // Lat/lon of the hotspot
-    let radiusMeters: Double                  // How close (in meters) to trigger an alert
-}
 
 // MARK: - GeofenceManager
 // Owns the CLLocationManager, checks proximity on every location update,
@@ -34,16 +27,8 @@ final class GeofenceManager: NSObject, ObservableObject {
     // Seeded test hotspots – replace/extend with Supabase data later
     // To test: put one coordinate near your actual current GPS location
     let hotspots: [Hotspot] = [
-        Hotspot(
-            name: "Old Town Haunt",
-            coordinate: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
-            radiusMeters: 50
-        ),
-        Hotspot(
-            name: "Haunted Bridge",
-            coordinate: CLLocationCoordinate2D(latitude: 37.8044, longitude: -122.2712),
-            radiusMeters: 50
-        )
+        Hotspot(id: UUID(), name: "Old Town Haunt", lat: 37.7749, lng: -122.4194, radius_m: 50, difficulty: 1, active: true),
+        Hotspot(id: UUID(), name: "Haunted Bridge", lat: 37.8044, lng: -122.2712, radius_m: 50, difficulty: 1, active: true)
     ]
 
     // MARK: Init
@@ -84,7 +69,7 @@ final class GeofenceManager: NSObject, ObservableObject {
         for hotspot in hotspots {
             let region = CLCircularRegion(
                 center: hotspot.coordinate,
-                radius: hotspot.radiusMeters,
+                radius: Double(hotspot.radius_m),
                 identifier: hotspot.id.uuidString  // Unique ID ties back to our Hotspot
             )
             region.notifyOnEntry = true   // Fire when user walks in
@@ -102,7 +87,7 @@ final class GeofenceManager: NSObject, ObservableObject {
             )
             let distance = userLocation.distance(from: hotspotLocation) // Returns metres (Double)
 
-            if distance <= hotspot.radiusMeters {
+            if distance <= Double(hotspot.radius_m) {
                 // Only fire the alert once per entry (guard against repeated triggers)
                 if nearbyHotspot?.id != hotspot.id {
                     nearbyHotspot  = hotspot
