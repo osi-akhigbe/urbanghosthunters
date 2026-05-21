@@ -58,14 +58,9 @@ struct AnomalyBannerView: View {
 // MARK: - Preview
 #Preview {
     ZStack(alignment: .top) {
-        Color.black.ignoresSafeArea()  // Dark background to mimic the app
-
+        Color.black.ignoresSafeArea()
         AnomalyBannerView(
-            hotspot: Hotspot(
-                name: "Old Town Haunt",
-                coordinate: .init(latitude: 0, longitude: 0),
-                radiusMeters: 50
-            ),
+            hotspot: Hotspot(id: UUID(), name: "Old Town Haunt", lat: 37.7749, lng: -122.4194, radius_m: 50, difficulty: 1, active: true),
             distance: 48,
             direction: "North",
             onDismiss: {}
