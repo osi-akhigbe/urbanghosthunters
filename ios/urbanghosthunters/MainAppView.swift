@@ -20,6 +20,11 @@ struct MainAppView: View {
                     .tabItem {
                         Label("Journal", systemImage: "book.fill")
                     }
+
+                InventoryView()
+                    .tabItem {
+                        Label("Inventory", systemImage: "bag.fill")
+                    }
             }
 
             // MARK: Anomaly banner
