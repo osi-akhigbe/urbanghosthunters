@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct MainAppView: View {
-    @StateObject private var supa     = SupabaseManager.shared
     @StateObject private var geofence = GeofenceManager.shared
 
     @State private var bannerDismissed = false
@@ -9,24 +8,33 @@ struct MainAppView: View {
     var body: some View {
         ZStack(alignment: .top) {
 
-            // MARK: Main content
             TabView {
-                MapView()
-                    .tabItem {
-                        Label("Map", systemImage: "map.fill")
-                    }
+                NavigationStack {
+                    MapView()
+                }
+                .tabItem {
+                    Label("Map", systemImage: "map.fill")
+                }
 
-                Text("Journal")
-                    .tabItem {
-                        Label("Journal", systemImage: "book.fill")
-                    }
+                NavigationStack {
+                    JournalView()
+                }
+                .tabItem {
+                    Label("Journal", systemImage: "book.fill")
+                }
+
+                NavigationStack {
+                    TotemLoadoutView()
+                }
+                .tabItem {
+                    Label("Loadout", systemImage: "shield.fill")
+                }
             }
 
-            // MARK: Anomaly banner
             if let hotspot = geofence.nearbyHotspot, !bannerDismissed {
                 AnomalyBannerView(
-                    hotspot:   hotspot,
-                    distance:  geofence.distanceMeters,
+                    hotspot: hotspot,
+                    distance: geofence.distanceMeters,
                     direction: geofence.directionLabel,
                     onDismiss: {
                         withAnimation {
@@ -37,10 +45,12 @@ struct MainAppView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: geofence.nearbyHotspot?.id)
             }
         }
-        .onAppear {
+        .task {
+            await geofence.loadHotspots()
             geofence.start()
+            await PlayerInventory.shared.load()
         }
-        .onChange(of: geofence.nearbyHotspot?.id) { _ in
+        .onChange(of: geofence.nearbyHotspot?.id) { _, _ in
             bannerDismissed = false
         }
     }

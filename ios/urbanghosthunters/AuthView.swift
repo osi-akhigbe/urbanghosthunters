@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Supabase
+import Auth
 
 struct AuthView: View {
     @StateObject private var supa = SupabaseManager.shared
