@@ -16,6 +16,7 @@ enum ContainmentOutcome {
 final class ContainmentViewModel {
     var points: [SealPoint] = []
     var outcome: ContainmentOutcome = .inProgress
+    var reward: ContainmentReward?
     var showResult: Bool = false
 
     private var timer: Timer?
@@ -30,6 +31,7 @@ final class ContainmentViewModel {
         prepareHaptics()
     }
 
+    // Counts down every second and auto-evaluates when time runs out
     func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -43,42 +45,58 @@ final class ContainmentViewModel {
         }
     }
 
+    // Cancels the countdown timer
     func stopTimer() {
         timer?.invalidate()
         timer = nil
     }
 
+    // Appends a new point to the seal drawing path
     func addPoint(_ point: SealPoint) {
         points.append(point)
     }
 
+    // Checks whether the drawn seal is valid (enough points and roughly closed),
+    // then calculates the reward and kicks off the save
     func evaluateSeal() {
         stopTimer()
         guard points.count > 20 else {
             outcome = .failed
+            reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: false)
             showResult = true
             return
         }
 
         guard let first = points.first, let last = points.last else {
             outcome = .failed
+            reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: false)
             showResult = true
             return
         }
 
         let dx = first.x - last.x
         let dy = first.y - last.y
-        let distance = sqrt(dx * dx + dy * dy)
+        let closed = sqrt(dx * dx + dy * dy) < 60
 
-        outcome = distance < 60 ? .success : .failed
+        outcome = closed ? .success : .failed
+        reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: closed)
         showResult = true
         playResultHaptic()
 
         Task { await saveEncounter() }
     }
 
+    // Saves the encounter result and reward to Supabase.
+    // If a new totem was earned, inserts it into the totems table and refreshes inventory.
     func saveEncounter() async {
-        guard let userId = SupabaseManager.shared.userId else { return }
+        guard let userId = SupabaseManager.shared.userId,
+              let reward else { return }
+
+        struct RewardsJSON: Encodable {
+            let xp: Int
+            let totem_shards: Int
+            let totem_granted: String?
+        }
 
         struct EncounterInsert: Encodable {
             let user_id: String
@@ -87,16 +105,15 @@ final class ContainmentViewModel {
             let rewards_json: RewardsJSON
         }
 
-        struct RewardsJSON: Encodable {
-            let xp: Int
-        }
-
-        let xp = outcome == .success ? 100 : 10
         let insert = EncounterInsert(
             user_id: userId,
             hotspot_id: hotspot.id,
             outcome: outcome == .success ? "captured" : "failed",
-            rewards_json: RewardsJSON(xp: xp)
+            rewards_json: RewardsJSON(
+                xp: reward.xp,
+                totem_shards: reward.totemShards,
+                totem_granted: reward.newTotem?.rawValue
+            )
         )
 
         do {
@@ -107,14 +124,40 @@ final class ContainmentViewModel {
         } catch {
             print("Failed to save encounter: \(error)")
         }
+
+        // Grant the new totem if one was earned
+        if let newTotemType = reward.newTotem {
+            await grantTotem(type: newTotemType, userId: userId)
+        }
     }
 
+    // Inserts a new totem row and refreshes the inventory so it appears immediately
+    private func grantTotem(type: TotemType, userId: String) async {
+        let row: [String: any Sendable] = [
+            "user_id":     userId,
+            "type":        type.rawValue,
+            "equipped":    false,
+            "effect_json": "{}"
+        ]
+        do {
+            try await SupabaseManager.shared.client
+                .from("totems")
+                .insert(row)
+                .execute()
+            await InventoryViewModel.shared.fetch()
+        } catch {
+            print("Failed to grant totem: \(error)")
+        }
+    }
+
+    // Prepares the haptic engine on supported devices
     func prepareHaptics() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
         hapticEngine = try? CHHapticEngine()
         try? hapticEngine?.start()
     }
 
+    // Plays a strong single haptic when the result is determined
     func playResultHaptic() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics,
               let engine = hapticEngine else { return }
@@ -130,6 +173,8 @@ final class ContainmentViewModel {
         }
     }
 }
+
+// MARK: - Containment View
 
 struct ContainmentView: View {
     let hotspot: Hotspot
@@ -150,6 +195,7 @@ struct ContainmentView: View {
                 .ignoresSafeArea()
 
             VStack {
+                // Top HUD: location label and countdown
                 HStack {
                     VStack(alignment: .leading) {
                         Text("CONTAINMENT")
@@ -206,12 +252,95 @@ struct ContainmentView: View {
         .onAppear { vm.startTimer() }
         .onDisappear { vm.stopTimer() }
         .sheet(isPresented: $vm.showResult) {
-            ResultSheet(outcome: vm.outcome, hotspot: hotspot) {
-                dismiss()
+            if let reward = vm.reward {
+                ResultSheet(outcome: vm.outcome, hotspot: hotspot, reward: reward) {
+                    dismiss()
+                }
             }
         }
     }
 }
+
+// MARK: - Result Sheet
+
+struct ResultSheet: View {
+    let outcome: ContainmentOutcome
+    let hotspot: Hotspot
+    let reward: ContainmentReward
+    let onDismiss: () -> Void
+
+    var body: some View {
+        VStack(spacing: 24) {
+            // Outcome icon
+            Image(systemName: outcome == .success ? "checkmark.seal.fill" : "xmark.seal.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(outcome == .success ? .green : .red)
+
+            Text(outcome == .success ? "Ghost Contained!" : "Containment Failed")
+                .font(.title2).bold()
+                .foregroundStyle(outcome == .success ? .green : .red)
+
+            Text(hotspot.name)
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            // Reward breakdown
+            VStack(spacing: 12) {
+                RewardRow(icon: "star.fill", label: "XP Earned", value: "+\(reward.xp) XP", color: .yellow)
+
+                if reward.totemShards > 0 {
+                    RewardRow(icon: "seal.fill",
+                              label: "Totem Shards",
+                              value: "+\(reward.totemShards)",
+                              color: .cyan)
+                }
+
+                if let newTotem = reward.newTotem {
+                    RewardRow(icon: newTotem.icon,
+                              label: "Totem Unlocked",
+                              value: newTotem.displayName,
+                              color: .purple)
+                }
+            }
+            .padding()
+            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+            .padding(.horizontal)
+
+            Button("Continue") {
+                onDismiss()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(.purple)
+        }
+        .padding()
+        .presentationDetents([.medium])
+    }
+}
+
+// A single line in the reward breakdown
+private struct RewardRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .frame(width: 24)
+            Text(label)
+                .foregroundStyle(.white)
+            Spacer()
+            Text(value)
+                .bold()
+                .foregroundStyle(color)
+        }
+        .font(.subheadline)
+    }
+}
+
+// MARK: - Seal Canvas
 
 struct SealCanvas: View {
     let points: [SealPoint]
@@ -238,7 +367,10 @@ struct SealCanvas: View {
     }
 }
 
+// MARK: - Grid Pattern
+
 struct GridPattern: Shape {
+    // Draws an evenly spaced grid of lines across the available rect
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let spacing: CGFloat = 30
@@ -255,39 +387,5 @@ struct GridPattern: Shape {
             y += spacing
         }
         return path
-    }
-}
-
-struct ResultSheet: View {
-    let outcome: ContainmentOutcome
-    let hotspot: Hotspot
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: outcome == .success ? "checkmark.seal.fill" : "xmark.seal.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(outcome == .success ? .green : .red)
-
-            Text(outcome == .success ? "Ghost Contained!" : "Containment Failed")
-                .font(.title2).bold()
-                .foregroundStyle(outcome == .success ? .green : .red)
-
-            Text(hotspot.name)
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Text(outcome == .success ? "+100 XP" : "+10 XP")
-                .font(.title3).bold()
-                .foregroundStyle(.purple)
-
-            Button("Continue") {
-                onDismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
-        }
-        .padding()
-        .presentationDetents([.medium])
     }
 }

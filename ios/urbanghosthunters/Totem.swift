@@ -45,3 +45,30 @@ struct TotemEffects {
     var alignmentWindowBonus: Double = 0
     var cooldownReduction: Double = 0
 }
+
+// Reward granted after a containment attempt
+struct ContainmentReward {
+    let xp: Int
+    let totemShards: Int
+    let newTotem: TotemType?
+}
+
+struct RewardCalculator {
+    // Returns the reward for a containment attempt based on difficulty and outcome.
+    // Failed attempts always give 10 XP with no other rewards.
+    // Higher difficulty gives more XP, shards, and a chance at a full totem.
+    static func calculate(difficulty: Int, success: Bool) -> ContainmentReward {
+        guard success else {
+            return ContainmentReward(xp: 10, totemShards: 0, newTotem: nil)
+        }
+        switch difficulty {
+        case 1:  return ContainmentReward(xp: 50,  totemShards: 0, newTotem: nil)
+        case 2:  return ContainmentReward(xp: 75,  totemShards: 1, newTotem: nil)
+        case 3:  return ContainmentReward(xp: 100, totemShards: 2, newTotem: nil)
+        case 4:  return ContainmentReward(xp: 150, totemShards: 3,
+                                          newTotem: Bool.random() ? TotemType.allCases.randomElement() : nil)
+        default: return ContainmentReward(xp: 200, totemShards: 3,
+                                          newTotem: TotemType.allCases.randomElement())
+        }
+    }
+}
