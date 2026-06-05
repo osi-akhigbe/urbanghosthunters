@@ -22,6 +22,17 @@ struct EncounterRow: Decodable, Identifiable, Hashable {
     var displayTitle: String {
         hotspots?.name ?? "Unknown haunt"
     }
+
+    var formattedDate: String {
+    guard let created_at else { return "Unknown date" }
+    let iso = ISO8601DateFormatter()
+    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+    guard let date = iso.date(from: created_at) else { return created_at }
+    let formatter = DateFormatter()
+    formatter.dateStyle = .medium
+    formatter.timeStyle = .short
+    return formatter.string(from: date)
+}
 }
 
 @Observable
@@ -132,7 +143,7 @@ struct EncounterDetailView: View {
                     LabeledContent("Reward", value: totem)
                 }
                 if let created = encounter.created_at {
-                    LabeledContent("When", value: created)
+                    LabeledContent("When", value: encounter.formattedDate)
                 }
             }
             Section {

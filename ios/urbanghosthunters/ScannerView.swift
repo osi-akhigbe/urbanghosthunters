@@ -123,6 +123,7 @@ struct ScannerView: View {
     @State private var vm: ScannerViewModel
     @State private var micLure = MicLureManager()
     @State private var showContainment = false
+    @State private var audioStatic = AudioStaticManager()
     @Environment(\.dismiss) private var dismiss
 
     private var canBeginContainment: Bool {
@@ -260,11 +261,18 @@ struct ScannerView: View {
                     .foregroundStyle(.purple)
             }
         }
-        .onAppear { micLure.prepare() }
+        .onAppear {
+    micLure.prepare()
+    audioStatic.prepare()
+  }
+  .onChange(of: vm.proximityLevel) { _, newValue in
+    audioStatic.setProximity(newValue)
+}
         .onDisappear {
-            vm.stop()
-            micLure.stop()
-        }
+    vm.stop()
+    micLure.stop()
+    audioStatic.stop()
+}
         .fullScreenCover(isPresented: $showContainment) {
             ContainmentView(hotspot: hotspot)
         }
