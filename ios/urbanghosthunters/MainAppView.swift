@@ -16,6 +16,7 @@ struct MainAppView: View {
                     Label("Map", systemImage: "map.fill")
                 }
 
+<<<<<<< HEAD
                 NavigationStack {
                     JournalView()
                 }
@@ -29,6 +30,17 @@ struct MainAppView: View {
                 .tabItem {
                     Label("Loadout", systemImage: "shield.fill")
                 }
+=======
+                Text("Journal")
+                    .tabItem {
+                        Label("Journal", systemImage: "book.fill")
+                    }
+
+                InventoryView()
+                    .tabItem {
+                        Label("Inventory", systemImage: "bag.fill")
+                    }
+>>>>>>> origin/feature/APPDEV-35/InventoryScreen
             }
 
             if let hotspot = geofence.nearbyHotspot, !bannerDismissed {
