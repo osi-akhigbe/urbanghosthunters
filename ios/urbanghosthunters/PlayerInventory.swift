@@ -24,6 +24,11 @@ final class PlayerInventory {
     var equippedTotem: Totem?
     var errorText: String?
 
+    var sealTimeBonus: Int {
+    guard equippedTotem?.bonus_type == "sealTime" else { return 0 }
+    return 5
+}
+
     var shieldBonus: Int {
         guard equippedTotem?.bonus_type == "shield" else { return 0 }
         return 15

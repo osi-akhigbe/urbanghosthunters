@@ -2,12 +2,10 @@ import SwiftUI
 
 struct MainAppView: View {
     @StateObject private var geofence = GeofenceManager.shared
-
     @State private var bannerDismissed = false
 
     var body: some View {
         ZStack(alignment: .top) {
-
             TabView {
                 NavigationStack {
                     MapView()
@@ -16,7 +14,6 @@ struct MainAppView: View {
                     Label("Map", systemImage: "map.fill")
                 }
 
-<<<<<<< HEAD
                 NavigationStack {
                     JournalView()
                 }
@@ -30,17 +27,6 @@ struct MainAppView: View {
                 .tabItem {
                     Label("Loadout", systemImage: "shield.fill")
                 }
-=======
-                Text("Journal")
-                    .tabItem {
-                        Label("Journal", systemImage: "book.fill")
-                    }
-
-                InventoryView()
-                    .tabItem {
-                        Label("Inventory", systemImage: "bag.fill")
-                    }
->>>>>>> origin/feature/APPDEV-35/InventoryScreen
             }
 
             if let hotspot = geofence.nearbyHotspot, !bannerDismissed {

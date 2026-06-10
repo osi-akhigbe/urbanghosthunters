@@ -61,6 +61,7 @@ final class JournalViewModel {
                 .execute()
                 .value
         } catch {
+            ErrorLogger.shared.log(error, context: "JournalViewModel.load")
             errorText = error.localizedDescription
         }
     }
@@ -169,6 +170,7 @@ struct EncounterDetailView: View {
                 .value
             replayHotspot = rows.first
         } catch {
+            ErrorLogger.shared.log(error, context: "EncounterDetailView.loadHotspotForReplay")
             print("Replay load failed: \(error)")
         }
     }

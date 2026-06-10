@@ -26,7 +26,7 @@ final class ContainmentViewModel {
 
     init(hotspot: Hotspot) {
         self.hotspot = hotspot
-        self.timeRemaining = 10 + InventoryViewModel.shared.effects.sealTimeBonus
+        self.timeRemaining = 10 + PlayerInventory.shared.shieldBonus
         prepareHaptics()
     }
 
@@ -167,7 +167,7 @@ struct ContainmentView: View {
                             .foregroundStyle(vm.timeRemaining <= 3 ? .red : .green)
                             .monospacedDigit()
 
-                        let bonus = InventoryViewModel.shared.effects.sealTimeBonus
+                        let bonus = PlayerInventory.shared.shieldBonus
                         if bonus > 0 {
                             Text("+\(bonus)s from totem")
                                 .font(.caption2)
