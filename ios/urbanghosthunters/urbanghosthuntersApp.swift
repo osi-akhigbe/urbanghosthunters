@@ -9,6 +9,12 @@ import SwiftUI
 
 @main
 struct urbanghosthuntersApp: App {
+    init() {
+        Task { @MainActor in
+            await PermissionsManager.shared.requestAll()
+        }
+    }
+
     var body: some Scene {
         WindowGroup {
             ContentView()

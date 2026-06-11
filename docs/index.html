@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Urban Ghost Hunter — Hunt. Scan. Contain.</title>
+  <meta name="description" content="Urban Ghost Hunter turns your neighbourhood into a paranormal battleground. Scan, detect and contain ghosts hiding in real locations near you." />
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body { background: #03001e; color: #f1f5f9; font-family: system-ui, -apple-system, sans-serif; }
+
+    /* NAV */
+    .nav { display: flex; align-items: center; justify-content: space-between; padding: 20px 40px; border-bottom: 0.5px solid rgba(255,255,255,0.08); position: sticky; top: 0; background: rgba(3,0,30,0.92); backdrop-filter: blur(12px); z-index: 100; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; font-size: 15px; font-weight: 500; color: #f1f5f9; text-decoration: none; }
+    .nav-icon { width: 32px; height: 32px; background: #0a0a1a; border: 1.5px solid #00ff88; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; }
+    .nav-links { display: flex; gap: 28px; }
+    .nav-links a { font-size: 13px; color: rgba(255,255,255,0.5); text-decoration: none; transition: color 0.15s; }
+    .nav-links a:hover { color: #00ff88; }
+
+    /* BUTTONS */
+    .btn-primary { display: inline-flex; align-items: center; gap: 8px; background: #00ff88; color: #03001e; padding: 13px 24px; border-radius: 10px; font-size: 14px; font-weight: 600; text-decoration: none; border: none; cursor: pointer; transition: background 0.15s; }
+    .btn-primary:hover { background: #00e87a; }
+    .btn-secondary { display: inline-flex; align-items: center; gap: 8px; background: transparent; color: rgba(255,255,255,0.6); padding: 13px 24px; border-radius: 10px; font-size: 14px; font-weight: 500; text-decoration: none; border: 0.5px solid rgba(255,255,255,0.15); cursor: pointer; transition: all 0.15s; }
+    .btn-secondary:hover { border-color: rgba(255,255,255,0.3); color: #f1f5f9; }
+
+    /* HERO */
+    .hero { text-align: center; padding: 80px 40px 60px; }
+    .hero-tag { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,255,136,0.08); border: 0.5px solid rgba(0,255,136,0.3); border-radius: 20px; padding: 5px 14px; font-size: 11px; font-weight: 500; color: #00ff88; letter-spacing: 2px; margin-bottom: 28px; }
+    .hero-tag::before { content: ''; width: 6px; height: 6px; background: #00ff88; border-radius: 50%; animation: blink 1.4s ease-in-out infinite; }
+    @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+    .hero h1 { font-size: clamp(36px, 6vw, 60px); font-weight: 600; line-height: 1.1; letter-spacing: -1.5px; margin-bottom: 16px; }
+    .hero h1 span { color: #00ff88; }
+    .hero-sub { font-size: 17px; color: rgba(255,255,255,0.45); margin-bottom: 36px; max-width: 420px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+    .cta-group { display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; }
+
+    /* ICON */
+    .hero-icon { margin: 60px auto 0; width: 200px; height: 200px; }
+    .icon-bg { width: 200px; height: 200px; background: #0a0a1a; border: 2px solid rgba(0,255,136,0.5); border-radius: 44px; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; }
+    .scanline { position: absolute; left: 0; right: 0; height: 1px; background: rgba(0,255,136,0.06); }
+    .ring { position: absolute; border: 1px solid rgba(0,255,136,0.2); border-radius: 50%; }
+
+    /* STATS */
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 1px; background: rgba(255,255,255,0.06); border-top: 0.5px solid rgba(255,255,255,0.06); border-bottom: 0.5px solid rgba(255,255,255,0.06); }
+    .stat { background: #03001e; padding: 28px 24px; text-align: center; }
+    .stat-num { font-size: 32px; font-weight: 600; color: #00ff88; letter-spacing: -1px; font-family: monospace; }
+    .stat-label { font-size: 12px; color: rgba(255,255,255,0.35); margin-top: 4px; letter-spacing: 1px; }
+
+    /* FEATURES */
+    .features { padding: 80px 40px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; max-width: 900px; margin: 0 auto; }
+    .features-title { grid-column: 1 / -1; text-align: center; margin-bottom: 12px; }
+    .feature-card { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 24px; transition: border-color 0.2s; }
+    .feature-card:hover { border-color: rgba(0,255,136,0.25); }
+    .feature-icon { width: 36px; height: 36px; background: rgba(0,255,136,0.08); border: 0.5px solid rgba(0,255,136,0.2); border-radius: 8px; display: flex; align-items: center; justify-content: center; margin-bottom: 14px; font-size: 18px; color: #00ff88; }
+    .feature-card h3 { font-size: 14px; font-weight: 500; color: #f1f5f9; margin-bottom: 8px; }
+    .feature-card p { font-size: 13px; color: rgba(255,255,255,0.4); line-height: 1.6; }
+
+    /* HOW IT WORKS */
+    .how { padding: 40px 40px 80px; max-width: 900px; margin: 0 auto; text-align: center; }
+    .section-tag { font-size: 11px; letter-spacing: 2px; color: #00ff88; font-weight: 500; margin-bottom: 12px; text-transform: uppercase; }
+    .section-title { font-size: clamp(22px, 4vw, 32px); font-weight: 500; color: #f1f5f9; margin-bottom: 40px; letter-spacing: -0.5px; }
+    .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; text-align: left; }
+    .step { background: rgba(255,255,255,0.03); border: 0.5px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 24px; }
+    .step-num { font-size: 11px; font-weight: 600; color: rgba(0,255,136,0.6); letter-spacing: 2px; margin-bottom: 12px; font-family: monospace; }
+    .step h3 { font-size: 14px; font-weight: 500; color: #f1f5f9; margin-bottom: 8px; }
+    .step p { font-size: 13px; color: rgba(255,255,255,0.4); line-height: 1.5; }
+
+    /* CTA SECTION */
+    .cta-section { padding: 80px 40px; text-align: center; background: rgba(0,255,136,0.03); border-top: 0.5px solid rgba(0,255,136,0.08); }
+    .cta-section h2 { font-size: clamp(28px, 4vw, 40px); font-weight: 500; color: #f1f5f9; letter-spacing: -1px; margin-bottom: 12px; }
+    .cta-section p { font-size: 15px; color: rgba(255,255,255,0.4); margin-bottom: 32px; }
+    .cta-note { font-size: 12px; color: rgba(255,255,255,0.2); margin-top: 16px; }
+
+    /* FOOTER */
+    .footer { padding: 24px 40px; border-top: 0.5px solid rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; }
+    .footer-left { font-size: 12px; color: rgba(255,255,255,0.25); }
+    .footer-right { display: flex; gap: 20px; }
+    .footer-right a { font-size: 12px; color: rgba(255,255,255,0.25); text-decoration: none; transition: color 0.15s; }
+    .footer-right a:hover { color: #00ff88; }
+
+    /* TOAST */
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px); background: #0d0d1a; border: 0.5px solid rgba(0,255,136,0.4); border-radius: 12px; padding: 14px 20px; display: flex; align-items: center; gap: 12px; min-width: 300px; max-width: 90vw; opacity: 0; transition: all 0.35s cubic-bezier(0.34, 1.56, 0.64, 1); pointer-events: none; z-index: 999; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); pointer-events: auto; }
+    .toast-icon { width: 32px; height: 32px; background: rgba(0,255,136,0.1); border: 0.5px solid rgba(0,255,136,0.3); border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 16px; color: #00ff88; }
+    .toast-text strong { display: block; font-size: 13px; font-weight: 500; color: #f1f5f9; margin-bottom: 2px; }
+    .toast-text span { font-size: 12px; color: rgba(255,255,255,0.4); }
+    .toast-close { margin-left: auto; background: none; border: none; color: rgba(255,255,255,0.3); cursor: pointer; font-size: 16px; padding: 2px 4px; line-height: 1; flex-shrink: 0; }
+    .toast-close:hover { color: rgba(255,255,255,0.6); }
+
+    /* RESPONSIVE */
+    @media (max-width: 600px) {
+      .nav { padding: 16px 20px; }
+      .nav-links { display: none; }
+      .hero { padding: 60px 20px 40px; }
+      .features { padding: 60px 20px; }
+      .how { padding: 20px 20px 60px; }
+      .cta-section { padding: 60px 20px; }
+      .footer { padding: 20px; flex-direction: column; align-items: flex-start; }
+      .stats { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <a class="nav-logo" href="#">
+      <div class="nav-icon">👻</div>
+      Urban Ghost Hunter
+    </a>
+    <div class="nav-links">
+      <a href="#features">Features</a>
+      <a href="#how">How it works</a>
+      <a href="#download">Download</a>
+    </div>
+    <button class="btn-primary" onclick="showToast()" style="padding:8px 16px;font-size:13px">Download</button>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-tag">Now available on iOS</div>
+    <h1>Hunt ghosts.<br><span>In your city.</span></h1>
+    <p class="hero-sub">Urban Ghost Hunter turns your neighbourhood into a paranormal battleground. Scan, detect and contain ghosts hiding in real locations near you.</p>
+    <div class="cta-group">
+      <button class="btn-primary" onclick="showToast()">
+        <i class="ti ti-brand-apple"></i>
+        Download on App Store
+      </button>
+      <button class="btn-secondary">
+        <i class="ti ti-player-play"></i>
+        Watch trailer
+      </button>
+    </div>
+    <div class="hero-icon">
+      <div class="icon-bg">
+        <div class="scanline" style="top:10%"></div>
+        <div class="scanline" style="top:20%"></div>
+        <div class="scanline" style="top:30%"></div>
+        <div class="scanline" style="top:40%"></div>
+        <div class="scanline" style="top:50%"></div>
+        <div class="scanline" style="top:60%"></div>
+        <div class="scanline" style="top:70%"></div>
+        <div class="scanline" style="top:80%"></div>
+        <div class="scanline" style="top:90%"></div>
+        <div class="ring" style="width:160px;height:160px;top:50%;left:50%;transform:translate(-50%,-50%)"></div>
+        <div class="ring" style="width:110px;height:110px;top:50%;left:50%;transform:translate(-50%,-50%);border-color:rgba(0,255,136,0.3)"></div>
+        <svg width="120" height="140" viewBox="0 0 120 140" fill="none">
+          <path d="M15 90 Q15 30 60 22 Q105 30 105 90 L105 118 L90 102 L75 118 L60 102 L45 118 L30 102 L15 118 Z" fill="#0d0030" stroke="#7c3aed" stroke-width="1.5"/>
+          <path d="M22 48 Q60 36 98 48 Q92 58 60 54 Q28 58 22 48 Z" fill="white" opacity="0.05"/>
+          <ellipse cx="42" cy="68" rx="14" ry="17" fill="#7c3aed"/>
+          <ellipse cx="78" cy="68" rx="14" ry="17" fill="#7c3aed"/>
+          <ellipse cx="42" cy="70" rx="7" ry="9" fill="#e9d5ff"/>
+          <ellipse cx="78" cy="70" rx="7" ry="9" fill="#e9d5ff"/>
+          <ellipse cx="38" cy="64" rx="3" ry="3" fill="white" opacity="0.9"/>
+          <ellipse cx="74" cy="64" rx="3" ry="3" fill="white" opacity="0.9"/>
+          <path d="M48 88 Q60 98 72 88" fill="none" stroke="#a78bfa" stroke-width="2" stroke-linecap="round"/>
+          <line x1="60" y1="10" x2="60" y2="26" stroke="#00ff88" stroke-width="1.5" opacity="0.7"/>
+          <line x1="60" y1="100" x2="60" y2="116" stroke="#00ff88" stroke-width="1.5" opacity="0.7"/>
+          <line x1="4" y1="68" x2="20" y2="68" stroke="#00ff88" stroke-width="1.5" opacity="0.7"/>
+          <line x1="100" y1="68" x2="116" y2="68" stroke="#00ff88" stroke-width="1.5" opacity="0.7"/>
+          <circle cx="60" cy="68" r="6" fill="none" stroke="#00ff88" stroke-width="1.5" opacity="0.8"/>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats">
+    <div class="stat"><div class="stat-num">50+</div><div class="stat-label">Hotspots</div></div>
+    <div class="stat"><div class="stat-num">3</div><div class="stat-label">Difficulty levels</div></div>
+    <div class="stat"><div class="stat-num">∞</div><div class="stat-label">Ghosts to catch</div></div>
+    <div class="stat"><div class="stat-num">iOS</div><div class="stat-label">Platform</div></div>
+  </div>
+
+  <!-- FEATURES -->
+  <section class="features" id="features">
+    <div class="features-title">
+      <div class="section-tag">Features</div>
+      <h2 class="section-title">Everything you need to hunt</h2>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><i class="ti ti-map-pin"></i></div>
+      <h3>Real locations</h3>
+      <p>Hotspots are mapped to real streets and landmarks in your city.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><i class="ti ti-radar"></i></div>
+      <h3>Live scanner</h3>
+      <p>Compass and proximity meters guide you toward paranormal activity.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><i class="ti ti-hexagon"></i></div>
+      <h3>Seal containment</h3>
+      <p>Draw seals on your screen to trap ghosts before time runs out.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon"><i class="ti ti-backpack"></i></div>
+      <h3>Inventory & totems</h3>
+      <p>Earn rewards, collect totems, and upgrade your ghost hunting kit.</p>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section class="how" id="how">
+    <div class="section-tag">How it works</div>
+    <h2 class="section-title">Three steps to your first catch</h2>
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">01 / FIND</div>
+        <h3>Locate a hotspot</h3>
+        <p>Open the map and walk toward a nearby anomaly detected in your area.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">02 / SCAN</div>
+        <h3>Align your scanner</h3>
+        <p>Face the hotspot and wait for your proximity and heading meters to peak.</p>
+      </div>
+      <div class="step">
+        <div class="step-num">03 / CONTAIN</div>
+        <h3>Draw the seal</h3>
+        <p>Trace a containment seal on screen before the timer runs out to capture the ghost.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta-section" id="download">
+    <h2>Ready to hunt?</h2>
+    <p>Download Urban Ghost Hunter and start your first investigation today.</p>
+    <button class="btn-primary" onclick="showToast()" style="font-size:15px;padding:15px 32px">
+      <i class="ti ti-brand-apple"></i>
+      Download on App Store
+    </button>
+    <p class="cta-note">iOS 17+ required · Free to download</p>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-left">© 2026 Urban Ghost Hunter · Built at Informatica Emmen</div>
+    <div class="footer-right">
+      <a href="#">Privacy</a>
+      <a href="#">Contact</a>
+      <a href="#">GitHub</a>
+    </div>
+  </footer>
+
+  <!-- TOAST -->
+  <div class="toast" id="toast">
+    <div class="toast-icon"><i class="ti ti-clock"></i></div>
+    <div class="toast-text">
+      <strong>Coming soon to App Store</strong>
+      <span>We're finishing the final touches — stay tuned!</span>
+    </div>
+    <button class="toast-close" onclick="hideToast()">✕</button>
+  </div>
+
+  <script>
+    let toastTimer;
+    function showToast() {
+      const t = document.getElementById('toast');
+      t.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(hideToast, 4000);
+    }
+    function hideToast() {
+      document.getElementById('toast').classList.remove('show');
+    }
+  </script>
+
+</body>
+</html>
