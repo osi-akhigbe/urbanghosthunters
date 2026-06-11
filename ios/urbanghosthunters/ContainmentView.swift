@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreHaptics
 import Supabase
+import ARKit
 
 struct SealPoint: Equatable {
     let x: CGFloat
@@ -134,7 +135,10 @@ final class ContainmentViewModel {
 struct ContainmentView: View {
     let hotspot: Hotspot
     @State private var vm: ContainmentViewModel
+    @State private var proximityLevel: Double = 0.5
     @Environment(\.dismiss) private var dismiss
+
+    private let arSupported = ARWorldTrackingConfiguration.isSupported
 
     init(hotspot: Hotspot) {
         self.hotspot = hotspot
@@ -143,10 +147,21 @@ struct ContainmentView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            if arSupported {
+                ARGhostView(proximityLevel: proximityLevel)
+                    .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+                GridPattern()
+                    .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                    .ignoresSafeArea()
+            }
+
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
 
             GridPattern()
-                .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
                 .ignoresSafeArea()
 
             VStack {
@@ -160,13 +175,11 @@ struct ContainmentView: View {
                             .foregroundStyle(.white)
                     }
                     Spacer()
-
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(vm.timeRemaining)s")
                             .font(.title).bold()
                             .foregroundStyle(vm.timeRemaining <= 3 ? .red : .green)
                             .monospacedDigit()
-
                         let bonus = PlayerInventory.shared.shieldBonus
                         if bonus > 0 {
                             Text("+\(bonus)s from totem")
@@ -184,7 +197,7 @@ struct ContainmentView: View {
                 .overlay(
                     Text("Draw a seal to contain the ghost")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.white.opacity(0.6))
                         .padding(.bottom, 8),
                     alignment: .bottom
                 )
@@ -234,27 +247,7 @@ struct SealCanvas: View {
                     onPoint(SealPoint(x: value.location.x, y: value.location.y))
                 }
         )
-        .background(Color.black.opacity(0.01))
-    }
-}
-
-struct GridPattern: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let spacing: CGFloat = 30
-        var x: CGFloat = 0
-        while x <= rect.width {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
-            x += spacing
-        }
-        var y: CGFloat = 0
-        while y <= rect.height {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
-            y += spacing
-        }
-        return path
+        .background(Color.clear)
     }
 }
 
