@@ -264,8 +264,8 @@ struct ScannerView: View {
         .onAppear {
     micLure.prepare()
     audioStatic.prepare()
-  }
-  .onChange(of: vm.proximityLevel) { _, newValue in
+}
+.onChange(of: vm.proximityLevel) { _, newValue in
     audioStatic.setProximity(newValue)
 }
         .onDisappear {
@@ -273,10 +273,10 @@ struct ScannerView: View {
     micLure.stop()
     audioStatic.stop()
 }
-        .fullScreenCover(isPresented: $showContainment) {
-            ContainmentView(hotspot: hotspot)
-        }
-    }
+    .fullScreenCover(isPresented: $showContainment) {
+   ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
+}
+}
 }
 
 // MARK: - Compass Meter

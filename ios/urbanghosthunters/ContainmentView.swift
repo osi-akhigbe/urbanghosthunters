@@ -135,15 +135,16 @@ final class ContainmentViewModel {
 struct ContainmentView: View {
     let hotspot: Hotspot
     @State private var vm: ContainmentViewModel
-    @State private var proximityLevel: Double = 0.5
+   let proximityLevel: Double
     @Environment(\.dismiss) private var dismiss
 
     private let arSupported = ARWorldTrackingConfiguration.isSupported
 
-    init(hotspot: Hotspot) {
-        self.hotspot = hotspot
-        _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
-    }
+   init(hotspot: Hotspot, proximityLevel: Double) {
+    self.hotspot = hotspot
+    self.proximityLevel = proximityLevel
+    _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
+}
 
     var body: some View {
         ZStack {
