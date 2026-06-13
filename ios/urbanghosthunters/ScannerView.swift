@@ -224,6 +224,11 @@ struct ScannerView: View {
 
                 Spacer()
 
+                // Nearby agents
+                NearbyAgentsView()
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                
                 Button {
                     showContainment = true
                 } label: {
