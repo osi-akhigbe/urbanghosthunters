@@ -7,48 +7,98 @@ import SwiftUI
 import ARKit
 import RealityKit
 
+// MARK: - AR Session Delegate
+class GhostARSessionDelegate: NSObject, ARSessionDelegate  {
+    var onTrackingStateChanged: ((String?) -> Void)?
+
+    func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
+        switch camera.trackingState {
+        case .normal:
+            onTrackingStateChanged?(nil)
+        case .limited(let reason):
+            switch reason {
+            case .initializing:
+                onTrackingStateChanged?("Initializing AR…")
+            case .excessiveMotion:
+                onTrackingStateChanged?("Move slower")
+            case .insufficientFeatures:
+                onTrackingStateChanged?("Point at a surface")
+            case .relocalizing:
+                onTrackingStateChanged?("Relocalizing…")
+            @unknown default:
+                onTrackingStateChanged?("Limited tracking")
+            }
+        case .notAvailable:
+            onTrackingStateChanged?("AR unavailable")
+        }
+    }
+
+    func session(_ session: ARSession, didFailWithError error: Error) {
+        onTrackingStateChanged?("AR error — restarting")
+    }
+
+    func sessionWasInterrupted(_ session: ARSession) {
+        onTrackingStateChanged?("AR interrupted")
+    }
+
+    func sessionInterruptionEnded(_ session: ARSession) {
+        onTrackingStateChanged?(nil)
+    }
+}
+
+// MARK: - AR Ghost View
 struct ARGhostView: UIViewRepresentable {
     var proximityLevel: Double
 
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
 
-        // Basic world tracking config
+        // Performance: disable unnecessary rendering features
+        arView.renderOptions = [
+            .disableDepthOfField,
+            .disableMotionBlur,
+            .disableHDR,
+            .disableFaceOcclusions
+        ]
+
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
+
+        // Performance: disable environment texturing to save GPU
+        config.environmentTexturing = .none
+
+        arView.session.delegate = context.coordinator.sessionDelegate
         arView.session.run(config)
 
-        // Place a ghost anchor 1.5m in front of the user
+        // Ghost anchor 1.5m ahead, slightly below eye level
         let anchor = AnchorEntity(world: [0, -0.5, -1.5])
 
-        // Ghost mesh — glowing sphere as placeholder until .usdz is ready
         let ghostMesh = MeshResource.generateSphere(radius: 0.15)
         let ghostMaterial = SimpleMaterial(
             color: UIColor.purple.withAlphaComponent(0.8),
             isMetallic: false
         )
         let ghostEntity = ModelEntity(mesh: ghostMesh, materials: [ghostMaterial])
-
-        // Floating animation
-        let floatUp = Transform(translation: [0, 0.1, 0])
-        let floatDown = Transform(translation: [0, -0.1, 0])
-        ghostEntity.move(to: floatUp, relativeTo: ghostEntity, duration: 1.0, timingFunction: .easeInOut)
-
         anchor.addChild(ghostEntity)
         arView.scene.addAnchor(anchor)
 
         context.coordinator.ghostEntity = ghostEntity
         context.coordinator.arView = arView
 
+        // Handle tracking state changes
+        context.coordinator.sessionDelegate.onTrackingStateChanged = { message in
+            DispatchQueue.main.async {
+                context.coordinator.trackingMessage = message
+            }
+        }
+
         return arView
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
-        // Scale ghost based on proximity — bigger and brighter as you get closer
         let scale = Float(0.5 + proximityLevel * 1.5)
         context.coordinator.ghostEntity?.scale = [scale, scale, scale]
 
-        // Update opacity based on proximity
         let alpha = CGFloat(0.3 + proximityLevel * 0.7)
         let material = SimpleMaterial(
             color: UIColor.purple.withAlphaComponent(alpha),
@@ -64,10 +114,12 @@ struct ARGhostView: UIViewRepresentable {
     class Coordinator {
         var ghostEntity: ModelEntity?
         var arView: ARView?
+        var trackingMessage: String?
+        let sessionDelegate = GhostARSessionDelegate()
     }
 }
 
-// Fallback view for devices that don't support AR
+// MARK: - Fallback for unsupported devices
 struct ARUnsupportedView: View {
     var body: some View {
         ZStack {

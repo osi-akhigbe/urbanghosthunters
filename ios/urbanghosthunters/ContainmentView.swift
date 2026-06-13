@@ -132,6 +132,17 @@ final class ContainmentViewModel {
     }
 }
 
+struct ARContainerView: View {
+    var proximityLevel: Double
+
+    var body: some View {
+        ZStack {
+            ARGhostView(proximityLevel: proximityLevel)
+                .ignoresSafeArea()
+        }
+    }
+}
+
 struct ContainmentView: View {
     let hotspot: Hotspot
     @State private var vm: ContainmentViewModel
@@ -149,7 +160,7 @@ struct ContainmentView: View {
     var body: some View {
         ZStack {
             if arSupported {
-                ARGhostView(proximityLevel: proximityLevel)
+                ARContainerView(proximityLevel: proximityLevel)
                     .ignoresSafeArea()
             } else {
                 Color.black.ignoresSafeArea()
