@@ -124,6 +124,7 @@ struct ScannerView: View {
     @State private var micLure = MicLureManager()
     @State private var showContainment = false
     @State private var audioStatic = AudioStaticManager()
+    @State private var showCoop = false
     @Environment(\.dismiss) private var dismiss
 
     private var canBeginContainment: Bool {
@@ -143,6 +144,10 @@ struct ScannerView: View {
                 .stroke(Color.purple.opacity(0.1), lineWidth: 1)
                 .ignoresSafeArea()
 
+
+.fullScreenCover(isPresented: $showCoop) {
+    CoopRitualView(hotspot: hotspot)
+}
             VStack(spacing: 0) {
 
                 HStack {
@@ -224,6 +229,19 @@ struct ScannerView: View {
 
                 Spacer()
 
+Button {
+    showCoop = true
+} label: {
+    Label("CO-OP RITUAL", systemImage: "person.2.fill")
+        .font(.caption).bold()
+        .foregroundStyle(.purple)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.purple.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+}
+.padding(.horizontal)
+
                 // Nearby agents
                 NearbyAgentsView()
                     .padding(.horizontal)
@@ -279,7 +297,7 @@ struct ScannerView: View {
     audioStatic.stop()
 }
     .fullScreenCover(isPresented: $showContainment) {
-   ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
+    ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
 }
 }
 }
