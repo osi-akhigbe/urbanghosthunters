@@ -6,6 +6,7 @@
 import SwiftUI
 import CoreLocation
 import CoreHaptics
+import UIKit
 
 // MARK: - ViewModel
 @Observable
@@ -22,21 +23,53 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
     private var hapticTimer: Timer?
     let hotspot: Hotspot
 
-    init(hotspot: Hotspot) {
-        self.hotspot = hotspot
-        super.init()
-        locationManager.delegate = self
-        locationManager.desiredAccuracy = kCLLocationAccuracyBest
-        locationManager.startUpdatingLocation()
-        locationManager.startUpdatingHeading()
-        prepareHaptics()
+init(hotspot: Hotspot) {
+    self.hotspot = hotspot
+    super.init()
+    locationManager.delegate = self
+    locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters // start coarse
+    locationManager.distanceFilter = 5 // only update every 5 metres
+    locationManager.headingFilter = 3 // only update heading every 3 degrees
+    locationManager.startUpdatingLocation()
+    locationManager.startUpdatingHeading()
+    prepareHaptics()
+
+    // Stop sensors when app goes to background
+    NotificationCenter.default.addObserver(
+        forName: UIApplication.didEnterBackgroundNotification,
+        object: nil,
+        queue: .main
+    ) { [weak self] _ in
+        self?.pauseSensors()
     }
 
-    func stop() {
-        locationManager.stopUpdatingLocation()
-        locationManager.stopUpdatingHeading()
-        stopHaptics()
+    // Resume when app comes back
+    NotificationCenter.default.addObserver(
+        forName: UIApplication.willEnterForegroundNotification,
+        object: nil,
+        queue: .main
+    ) { [weak self] _ in
+        self?.resumeSensors()
     }
+}
+
+func stop() {
+    locationManager.stopUpdatingLocation()
+    locationManager.stopUpdatingHeading()
+    stopHaptics()
+    NotificationCenter.default.removeObserver(self)
+}
+
+func pauseSensors() {
+    locationManager.stopUpdatingLocation()
+    locationManager.stopUpdatingHeading()
+    stopHaptics()
+}
+
+func resumeSensors() {
+    locationManager.startUpdatingLocation()
+    locationManager.startUpdatingHeading()
+}
 
     private func bearingTo(lat: Double, lng: Double, from userLat: Double, userLng: Double) -> Double {
         let dLng = (lng - userLng) * .pi / 180
@@ -48,17 +81,7 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
         return (bearing + 360).truncatingRemainder(dividingBy: 360)
     }
 
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                     didUpdateLocations locations: [CLLocation]) {
-        guard let loc = locations.last else { return }
-        Task { @MainActor in
-            let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
-            let distance = loc.distance(from: hotspotLoc)
-            self.distanceMeters = distance
-            self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
-            self.updateHapticRate()
-        }
-    }
+  
 
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didUpdateHeading newHeading: CLHeading) {
@@ -81,6 +104,27 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
                                      didFailWithError error: Error) {
         Task { @MainActor in self.errorText = error.localizedDescription }
     }
+
+    nonisolated func locationManager(_ manager: CLLocationManager,
+                                 didUpdateLocations locations: [CLLocation]) {
+    guard let loc = locations.last else { return }
+    Task { @MainActor in
+        let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
+        let distance = loc.distance(from: hotspotLoc)
+        self.distanceMeters = distance
+        self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
+        self.updateHapticRate()
+
+        // Dynamically adjust accuracy based on distance
+        if distance > 100 {
+            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+            manager.distanceFilter = 10
+        } else {
+            manager.desiredAccuracy = kCLLocationAccuracyBest
+            manager.distanceFilter = 2
+        }
+    }
+}
 
     func prepareHaptics() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
