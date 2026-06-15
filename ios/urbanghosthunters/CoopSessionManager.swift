@@ -136,26 +136,26 @@ final class CoopSessionManager {
 
     // MARK: - Realtime subscription
     func subscribeToSession(sessionId: UUID) async {
-    let channel = await SupabaseManager.shared.client.realtimeV2.channel("coop_\(sessionId)")
+        let channel = await SupabaseManager.shared.client.realtimeV2.channel("coop_\(sessionId)")
 
-    await channel.onPostgresChange(
-        UpdateAction.self,
-        schema: "public",
-        table: "coop_sessions",
-        filter: "id=eq.\(sessionId.uuidString)"
-    ) { [weak self] change in
-        Task { @MainActor in
-            guard let self else { return }
-            if let updated = try? change.decodeRecord(as: CoopSession.self, decoder: JSONDecoder()) {
-                self.session = updated
-                self.updateStatusMessage(updated)
+        await channel.onPostgresChange(
+            UpdateAction.self,
+            schema: "public",
+            table: "coop_sessions",
+            filter: "id=eq.\(sessionId.uuidString)"
+        ) { [weak self] change in
+            Task { @MainActor in
+                guard let self else { return }
+                if let updated = try? change.decodeRecord(as: CoopSession.self, decoder: JSONDecoder()) {
+                    self.session = updated
+                    self.updateStatusMessage(updated)
+                }
             }
         }
-    }
 
-    await channel.subscribe()
-    realtimeChannel = channel
-}
+        await channel.subscribe()
+        realtimeChannel = channel
+    }
 
     private func updateStatusMessage(_ session: CoopSession) {
         switch CoopStatus(rawValue: session.status) ?? .waiting {
@@ -172,6 +172,7 @@ final class CoopSessionManager {
             let guestDone = session.guest_seal_complete
             if hostDone && guestDone {
                 statusMessage = "✅ Seal complete!"
+                Task { await completeRitual(hotspotId: session.hotspot_id) }
             } else if hostDone || guestDone {
                 statusMessage = "Waiting for partner to complete seal…"
             } else {
@@ -181,6 +182,47 @@ final class CoopSessionManager {
             statusMessage = "👻 Ghost contained together!"
         case .failed:
             statusMessage = "❌ Containment failed"
+        }
+    }
+
+    // MARK: - Grant rewards + shared journal entry
+    func completeRitual(hotspotId: UUID) async {
+        guard let session else { return }
+        guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+
+        struct EncounterInsert: Encodable {
+            let user_id: UUID
+            let hotspot_id: UUID
+            let outcome: String
+            let rewards_json: RewardsJSON
+        }
+
+        struct RewardsJSON: Encodable {
+            let xp: Int
+            let coop: Bool
+            let partner_id: String
+        }
+
+        let partnerId = isHost ? session.guest_id?.uuidString ?? "" : session.host_id.uuidString
+        let xp = 150
+
+        let insert = EncounterInsert(
+            user_id: userId,
+            hotspot_id: hotspotId,
+            outcome: "captured",
+            rewards_json: RewardsJSON(xp: xp, coop: true, partner_id: partnerId)
+        )
+
+        do {
+            try await SupabaseManager.shared.client
+                .from("encounters")
+                .insert(insert)
+                .execute()
+            await advanceStatus(to: .complete)
+            await PlayerInventory.shared.grantTotemIfNeeded(totemName: "Spirit Ward")
+        } catch {
+            ErrorLogger.shared.log(error, context: "CoopSessionManager.completeRitual")
+            errorText = error.localizedDescription
         }
     }
 
