@@ -115,6 +115,7 @@ struct MapView: View {
                 MapCompass()
             }
             .ignoresSafeArea()
+<<<<<<< HEAD
             .navigationDestination(item: $selectedHotspot) { hotspot in
                 ScannerView(hotspot: hotspot)
             }
@@ -143,6 +144,21 @@ struct MapView: View {
                     .background(.ultraThinMaterial, in: Capsule())
                     .padding(.bottom, 24)
             }
+=======
+.navigationDestination(item: $selectedHotspot) { hotspot in
+    ScannerView(hotspot: hotspot)
+}
+
+            if let nearest = vm.nearestHotspot {
+            NearestAnomalySheet(hotspot: nearest)
+            .padding()
+            .contentShape(Rectangle())
+            .onTapGesture
+    {
+            selectedHotspot = nearest
+        }
+}
+>>>>>>> origin/feature/APPDEV-16-map-screen
 
             if let error = vm.errorText, !error.isEmpty {
                 Text(error)
@@ -156,6 +172,7 @@ struct MapView: View {
         .task {
             await vm.fetchHotspots()
         }
+        
     }
 }
 
