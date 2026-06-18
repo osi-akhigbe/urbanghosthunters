@@ -12,6 +12,7 @@
 import SwiftUI
 import CoreHaptics
 import Supabase
+import ARKit
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -307,6 +308,7 @@ final class ContainmentViewModel {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 // MARK: - Main View
 >>>>>>> origin/feature/APPDEV-20-containment-mechanic
@@ -323,10 +325,47 @@ struct ContainmentView: View {
         self.hotspot = hotspot
         _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
     }
+=======
+struct ARContainerView: View {
+    var proximityLevel: Double
+>>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            ARGhostView(proximityLevel: proximityLevel)
+                .ignoresSafeArea()
+        }
+    }
+}
+
+struct ContainmentView: View {
+    let hotspot: Hotspot
+    @State private var vm: ContainmentViewModel
+   let proximityLevel: Double
+    @Environment(\.dismiss) private var dismiss
+
+    private let arSupported = ARWorldTrackingConfiguration.isSupported
+
+   init(hotspot: Hotspot, proximityLevel: Double) {
+    self.hotspot = hotspot
+    self.proximityLevel = proximityLevel
+    _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
+}
+
+    var body: some View {
+        ZStack {
+            if arSupported {
+                ARContainerView(proximityLevel: proximityLevel)
+                    .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+                GridPattern()
+                    .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                    .ignoresSafeArea()
+            }
+
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
 
 <<<<<<< HEAD
 <<<<<<< HEAD
@@ -336,7 +375,7 @@ struct ContainmentView: View {
 =======
 >>>>>>> origin/feature/APPDEV-38/reward-xp-totem
             GridPattern()
-                .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
                 .ignoresSafeArea()
 
             VStack {
@@ -360,16 +399,22 @@ struct ContainmentView: View {
                     Spacer()
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/feature/APPDEV-38/reward-xp-totem
 
+=======
+>>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(vm.timeRemaining)s")
                             .font(.title).bold()
                             .foregroundStyle(vm.timeRemaining <= 3 ? .red : .green)
                             .monospacedDigit()
+<<<<<<< HEAD
 
 <<<<<<< HEAD
+=======
+>>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
                         let bonus = PlayerInventory.shared.shieldBonus
 =======
                         let bonus = InventoryViewModel.shared.effects.sealTimeBonus
@@ -404,7 +449,7 @@ struct ContainmentView: View {
                 .overlay(
                     Text("Draw a seal to contain the ghost")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.white.opacity(0.6))
                         .padding(.bottom, 8),
                     alignment: .bottom
                 )
@@ -566,6 +611,7 @@ struct SealCanvas: View {
         )
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 >>>>>>> origin/feature/APPDEV-38/reward-xp-totem
         .background(Color.black.opacity(0.01))
@@ -603,6 +649,9 @@ struct GridPattern: Shape {
             y += spacing
         }
         return path
+=======
+        .background(Color.clear)
+>>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
     }
 }
 <<<<<<< HEAD

@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		6C2560ED2FAF361500364E80 /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 6C2560EC2FAF361500364E80 /* Supabase */; };
+		6CB5EF322FDA2BA5004DC289 /* ARKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6CB5EF312FDA2BA5004DC289 /* ARKit.framework */; };
+		6CB5EF342FDA2BDD004DC289 /* RealityKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6CB5EF332FDA2BDD004DC289 /* RealityKit.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -31,6 +33,8 @@
 		6C2560C02FAF2F3B00364E80 /* urbanghosthunters.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = urbanghosthunters.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		6C2560CD2FAF2F3D00364E80 /* urbanghosthuntersTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = urbanghosthuntersTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		6C2560D72FAF2F3D00364E80 /* urbanghosthuntersUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = urbanghosthuntersUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		6CB5EF312FDA2BA5004DC289 /* ARKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = ARKit.framework; path = System/Library/Frameworks/ARKit.framework; sourceTree = SDKROOT; };
+		6CB5EF332FDA2BDD004DC289 /* RealityKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = RealityKit.framework; path = System/Library/Frameworks/RealityKit.framework; sourceTree = SDKROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -69,6 +73,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				6CB5EF342FDA2BDD004DC289 /* RealityKit.framework in Frameworks */,
+				6CB5EF322FDA2BA5004DC289 /* ARKit.framework in Frameworks */,
 				6C2560ED2FAF361500364E80 /* Supabase in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -114,6 +120,8 @@
 		6C2560EB2FAF361500364E80 /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				6CB5EF332FDA2BDD004DC289 /* RealityKit.framework */,
+				6CB5EF312FDA2BA5004DC289 /* ARKit.framework */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";

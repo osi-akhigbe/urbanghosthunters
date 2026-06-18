@@ -399,11 +399,19 @@ struct ScannerView: View {
 
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
                 // Contain button
 >>>>>>> origin/feature/APPDEV-20-containment-mechanic
 =======
 >>>>>>> origin/feature/APPDEV-38/reward-xp-totem
+=======
+                // Nearby agents
+                NearbyAgentsView()
+                    .padding(.horizontal)
+                    .padding(.bottom, 8)
+                
+>>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
                 Button {
                     showContainment = true
                 } label: {
@@ -479,8 +487,8 @@ struct ScannerView: View {
         .onAppear {
     micLure.prepare()
     audioStatic.prepare()
-  }
-  .onChange(of: vm.proximityLevel) { _, newValue in
+}
+.onChange(of: vm.proximityLevel) { _, newValue in
     audioStatic.setProximity(newValue)
 }
         .onDisappear {
@@ -488,6 +496,7 @@ struct ScannerView: View {
     micLure.stop()
     audioStatic.stop()
 }
+<<<<<<< HEAD
 =======
         .onDisappear { vm.stop() }
 >>>>>>> origin/feature/APPDEV-20-containment-mechanic
@@ -498,6 +507,12 @@ struct ScannerView: View {
             ContainmentView(hotspot: hotspot)
         }
     }
+=======
+    .fullScreenCover(isPresented: $showContainment) {
+   ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
+}
+}
+>>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
 }
 
 <<<<<<< HEAD
