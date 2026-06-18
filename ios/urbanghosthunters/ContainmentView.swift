@@ -1,27 +1,52 @@
+<<<<<<< HEAD
+=======
+//
+//  ContainmentView.swift
+//  urbanghosthunters
+//
+
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 import SwiftUI
 import CoreHaptics
 import Supabase
 
+<<<<<<< HEAD
+=======
+// MARK: - Seal drawing model
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 struct SealPoint: Equatable {
     let x: CGFloat
     let y: CGFloat
 }
 
+<<<<<<< HEAD
+=======
+// MARK: - Encounter result
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 enum ContainmentOutcome {
     case success, failed, inProgress
 }
 
+<<<<<<< HEAD
+=======
+// MARK: - ViewModel
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 @Observable
 @MainActor
 final class ContainmentViewModel {
     var points: [SealPoint] = []
     var outcome: ContainmentOutcome = .inProgress
+<<<<<<< HEAD
+=======
+    var timeRemaining: Int = 10
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
     var showResult: Bool = false
 
     private var timer: Timer?
     private var hapticEngine: CHHapticEngine?
     let hotspot: Hotspot
 
+<<<<<<< HEAD
     var timeRemaining: Int
 
     init(hotspot: Hotspot) {
@@ -30,6 +55,14 @@ final class ContainmentViewModel {
         prepareHaptics()
     }
 
+=======
+    init(hotspot: Hotspot) {
+        self.hotspot = hotspot
+        prepareHaptics()
+    }
+
+    // MARK: - Timer
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
     func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -48,6 +81,10 @@ final class ContainmentViewModel {
         timer = nil
     }
 
+<<<<<<< HEAD
+=======
+    // MARK: - Seal evaluation
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
     func addPoint(_ point: SealPoint) {
         points.append(point)
     }
@@ -60,6 +97,10 @@ final class ContainmentViewModel {
             return
         }
 
+<<<<<<< HEAD
+=======
+        // Check if seal is roughly closed (start and end points within 60pts)
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
         guard let first = points.first, let last = points.last else {
             outcome = .failed
             showResult = true
@@ -77,6 +118,10 @@ final class ContainmentViewModel {
         Task { await saveEncounter() }
     }
 
+<<<<<<< HEAD
+=======
+    // MARK: - Save to Supabase
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
     func saveEncounter() async {
         guard let userId = SupabaseManager.shared.userId else { return }
 
@@ -109,6 +154,10 @@ final class ContainmentViewModel {
         }
     }
 
+<<<<<<< HEAD
+=======
+    // MARK: - Haptics
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
     func prepareHaptics() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
         hapticEngine = try? CHHapticEngine()
@@ -121,8 +170,12 @@ final class ContainmentViewModel {
 
         let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
         let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 1.0)
+<<<<<<< HEAD
         let event = CHHapticEvent(eventType: .hapticTransient,
                                   parameters: [intensity, sharpness], relativeTime: 0)
+=======
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 
         if let pattern = try? CHHapticPattern(events: [event], parameters: []),
            let player = try? engine.makePlayer(with: pattern) {
@@ -131,6 +184,10 @@ final class ContainmentViewModel {
     }
 }
 
+<<<<<<< HEAD
+=======
+// MARK: - Main View
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 struct ContainmentView: View {
     let hotspot: Hotspot
     @State private var vm: ContainmentViewModel
@@ -145,11 +202,19 @@ struct ContainmentView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
+<<<<<<< HEAD
+=======
+            // HUD background grid
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
             GridPattern()
                 .stroke(Color.purple.opacity(0.15), lineWidth: 1)
                 .ignoresSafeArea()
 
             VStack {
+<<<<<<< HEAD
+=======
+                // Top HUD
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
                 HStack {
                     VStack(alignment: .leading) {
                         Text("CONTAINMENT")
@@ -160,6 +225,7 @@ struct ContainmentView: View {
                             .foregroundStyle(.white)
                     }
                     Spacer()
+<<<<<<< HEAD
 
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("\(vm.timeRemaining)s")
@@ -177,6 +243,17 @@ struct ContainmentView: View {
                 }
                 .padding()
 
+=======
+                    // Countdown
+                    Text("\(vm.timeRemaining)s")
+                        .font(.title).bold()
+                        .foregroundStyle(vm.timeRemaining <= 3 ? .red : .green)
+                        .monospacedDigit()
+                }
+                .padding()
+
+                // Drawing canvas
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
                 SealCanvas(points: vm.points) { point in
                     vm.addPoint(point)
                 }
@@ -189,6 +266,10 @@ struct ContainmentView: View {
                     alignment: .bottom
                 )
 
+<<<<<<< HEAD
+=======
+                // Submit button
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
                 Button {
                     vm.evaluateSeal()
                 } label: {
@@ -213,6 +294,10 @@ struct ContainmentView: View {
     }
 }
 
+<<<<<<< HEAD
+=======
+// MARK: - Seal Canvas
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 struct SealCanvas: View {
     let points: [SealPoint]
     let onPoint: (SealPoint) -> Void
@@ -226,6 +311,11 @@ struct SealCanvas: View {
                 path.addLine(to: CGPoint(x: point.x, y: point.y))
             }
             context.stroke(path, with: .color(.purple), lineWidth: 3)
+<<<<<<< HEAD
+=======
+
+            // Glow effect
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
             context.stroke(path, with: .color(.purple.opacity(0.3)), lineWidth: 8)
         }
         .gesture(
@@ -234,10 +324,18 @@ struct SealCanvas: View {
                     onPoint(SealPoint(x: value.location.x, y: value.location.y))
                 }
         )
+<<<<<<< HEAD
         .background(Color.black.opacity(0.01))
     }
 }
 
+=======
+        .background(Color.black.opacity(0.01)) // needed for gesture hit testing
+    }
+}
+
+// MARK: - Grid Pattern
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 struct GridPattern: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
@@ -258,6 +356,10 @@ struct GridPattern: Shape {
     }
 }
 
+<<<<<<< HEAD
+=======
+// MARK: - Result Sheet
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
 struct ResultSheet: View {
     let outcome: ContainmentOutcome
     let hotspot: Hotspot
@@ -290,4 +392,8 @@ struct ResultSheet: View {
         .padding()
         .presentationDetents([.medium])
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> origin/feature/APPDEV-20-containment-mechanic
