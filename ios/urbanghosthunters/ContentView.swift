@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct ContentView: View {
     @ObservedObject private var supa = SupabaseManager.shared

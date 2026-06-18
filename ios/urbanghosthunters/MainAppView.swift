@@ -1,4 +1,5 @@
 import SwiftUI
+import Supabase
 
 struct MainAppView: View {
     @StateObject private var geofence = GeofenceManager.shared
