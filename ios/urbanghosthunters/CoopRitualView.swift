@@ -4,6 +4,10 @@
 //
 
 import SwiftUI
+<<<<<<< HEAD
+=======
+import Supabase
+>>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual
 
 struct CoopRitualView: View {
     let hotspot: Hotspot
@@ -295,6 +299,7 @@ struct JoinSessionSheet: View {
     }
 }
 
+<<<<<<< HEAD
 // MARK: - Grant rewards + shared journal entry
 func completeRitual(hotspotId: UUID) async {
     guard let session else { return }
@@ -337,6 +342,8 @@ func completeRitual(hotspotId: UUID) async {
     }
 }
 
+=======
+>>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual
 // MARK: - Coop Seal Canvas
 struct CoopSealCanvas: View {
     let onComplete: () -> Void
@@ -379,4 +386,8 @@ struct CoopSealCanvas: View {
             }
         }
     }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual

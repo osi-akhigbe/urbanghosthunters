@@ -212,6 +212,7 @@ struct ScannerView: View {
     @State private var micLure = MicLureManager()
     @State private var showContainment = false
     @State private var audioStatic = AudioStaticManager()
+    @State private var showCoop = false
     @Environment(\.dismiss) private var dismiss
 
     private var canBeginContainment: Bool {
@@ -257,6 +258,10 @@ struct ScannerView: View {
                 .stroke(Color.purple.opacity(0.1), lineWidth: 1)
                 .ignoresSafeArea()
 
+
+.fullScreenCover(isPresented: $showCoop) {
+    CoopRitualView(hotspot: hotspot)
+}
             VStack(spacing: 0) {
 <<<<<<< HEAD
 
@@ -400,12 +405,28 @@ struct ScannerView: View {
 <<<<<<< HEAD
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
                 // Contain button
 >>>>>>> origin/feature/APPDEV-20-containment-mechanic
 =======
 >>>>>>> origin/feature/APPDEV-38/reward-xp-totem
 =======
+=======
+Button {
+    showCoop = true
+} label: {
+    Label("CO-OP RITUAL", systemImage: "person.2.fill")
+        .font(.caption).bold()
+        .foregroundStyle(.purple)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color.purple.opacity(0.15))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+}
+.padding(.horizontal)
+
+>>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual
                 // Nearby agents
                 NearbyAgentsView()
                     .padding(.horizontal)
@@ -509,7 +530,7 @@ struct ScannerView: View {
     }
 =======
     .fullScreenCover(isPresented: $showContainment) {
-   ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
+    ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
 }
 }
 >>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
