@@ -31,7 +31,7 @@ enum TotemType: String, Codable, CaseIterable {
 }
 
 // Matches the totems table schema in Supabase
-struct Totem: Identifiable, Codable {
+struct GameTotem: Identifiable, Codable {
     let id: UUID
     let user_id: UUID
     let type: TotemType

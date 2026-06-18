@@ -1,17 +1,18 @@
 import Foundation
 import Observation
+import Supabase
 
 @Observable
 @MainActor
 final class InventoryViewModel {
     static let shared = InventoryViewModel()
 
-    var totems: [Totem] = []
+    var totems: [GameTotem] = []
     var isLoading = false
     var errorText: String?
 
     // All totems the user currently has equipped
-    var equippedTotems: [Totem] {
+    var equippedTotems: [GameTotem] {
         totems.filter { $0.equipped }
     }
 
@@ -43,7 +44,7 @@ final class InventoryViewModel {
 
     // Flips a totem's equipped state locally and syncs the change to Supabase.
     // Rolls back the local change if the Supabase update fails.
-    func toggleEquip(_ totem: Totem) async {
+    func toggleEquip(_ totem: GameTotem) async {
         guard let index = totems.firstIndex(where: { $0.id == totem.id }) else { return }
         let newValue = !totem.equipped
         totems[index].equipped = newValue
@@ -62,13 +63,14 @@ final class InventoryViewModel {
     // Inserts one totem of each type for a new user so they have something to equip
     private func seedStarterTotems() async {
         guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
+        struct StarterTotem: Encodable {
+            let user_id: String
+            let type: String
+            let equipped: Bool
+            let effect_json: String
+        }
         let starters = TotemType.allCases.map { type in
-            [
-                "user_id":     userId.uuidString,
-                "type":        type.rawValue,
-                "equipped":    false,
-                "effect_json": "{}"
-            ] as [String: any Sendable]
+            StarterTotem(user_id: userId.uuidString, type: type.rawValue, equipped: false, effect_json: "{}")
         }
         do {
             totems = try await SupabaseManager.shared.client

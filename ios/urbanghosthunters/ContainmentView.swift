@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreHaptics
 import Supabase
+import ARKit
 
 struct SealPoint: Equatable {
     let x: CGFloat
@@ -31,7 +32,6 @@ final class ContainmentViewModel {
         prepareHaptics()
     }
 
-    // Counts down every second and auto-evaluates when time runs out
     func startTimer() {
         timer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
             guard let self else { return }
@@ -45,20 +45,17 @@ final class ContainmentViewModel {
         }
     }
 
-    // Cancels the countdown timer
     func stopTimer() {
         timer?.invalidate()
         timer = nil
     }
 
-    // Appends a new point to the seal drawing path
     func addPoint(_ point: SealPoint) {
         points.append(point)
     }
 
-    // Checks whether the drawn seal is valid (enough points and roughly closed),
-    // then calculates the reward and kicks off the save
-    func evaluateSeal() {
+    // Default nil = timer expiry with no ghost position → auto fail
+    func evaluateSeal(ghostScreenPosition: CGPoint? = nil) {
         stopTimer()
         guard points.count > 20 else {
             outcome = .failed
@@ -78,16 +75,33 @@ final class ContainmentViewModel {
         let dy = first.y - last.y
         let closed = sqrt(dx * dx + dy * dy) < 60
 
-        outcome = closed ? .success : .failed
-        reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: closed)
+        let ghostCaptured: Bool
+        if let ghostPos = ghostScreenPosition {
+            ghostCaptured = sealContains(ghostPos)
+        } else {
+            ghostCaptured = false
+        }
+
+        let success = closed && ghostCaptured
+        outcome = success ? .success : .failed
+        reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: success)
         showResult = true
         playResultHaptic()
 
         Task { await saveEncounter() }
     }
 
-    // Saves the encounter result and reward to Supabase.
-    // If a new totem was earned, inserts it into the totems table and refreshes inventory.
+    private func sealContains(_ point: CGPoint) -> Bool {
+        guard points.count > 5 else { return false }
+        var path = Path()
+        path.move(to: CGPoint(x: points[0].x, y: points[0].y))
+        for p in points.dropFirst() {
+            path.addLine(to: CGPoint(x: p.x, y: p.y))
+        }
+        path.closeSubpath()
+        return path.contains(point)
+    }
+
     func saveEncounter() async {
         guard let userId = SupabaseManager.shared.userId,
               let reward else { return }
@@ -125,20 +139,24 @@ final class ContainmentViewModel {
             print("Failed to save encounter: \(error)")
         }
 
-        // Grant the new totem if one was earned
         if let newTotemType = reward.newTotem {
             await grantTotem(type: newTotemType, userId: userId)
         }
     }
 
-    // Inserts a new totem row and refreshes the inventory so it appears immediately
     private func grantTotem(type: TotemType, userId: String) async {
-        let row: [String: any Sendable] = [
-            "user_id":     userId,
-            "type":        type.rawValue,
-            "equipped":    false,
-            "effect_json": "{}"
-        ]
+        struct TotemInsert: Encodable {
+            let user_id: String
+            let type: String
+            let equipped: Bool
+            let effect_json: String
+        }
+        let row = TotemInsert(
+            user_id: userId,
+            type: type.rawValue,
+            equipped: false,
+            effect_json: "{}"
+        )
         do {
             try await SupabaseManager.shared.client
                 .from("totems")
@@ -150,14 +168,12 @@ final class ContainmentViewModel {
         }
     }
 
-    // Prepares the haptic engine on supported devices
     func prepareHaptics() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
         hapticEngine = try? CHHapticEngine()
         try? hapticEngine?.start()
     }
 
-    // Plays a strong single haptic when the result is determined
     func playResultHaptic() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics,
               let engine = hapticEngine else { return }
@@ -174,28 +190,65 @@ final class ContainmentViewModel {
     }
 }
 
+// MARK: - AR Container
+
+struct ARContainerView: View {
+    var proximityLevel: Double
+    var onTrackingMessage: ((String?) -> Void)?
+    var onGhostScreenPosition: ((CGPoint) -> Void)?
+
+    var body: some View {
+        ARGhostView(
+            proximityLevel: proximityLevel,
+            onTrackingMessage: onTrackingMessage,
+            onGhostScreenPosition: onGhostScreenPosition
+        )
+        .ignoresSafeArea()
+    }
+}
+
 // MARK: - Containment View
 
 struct ContainmentView: View {
     let hotspot: Hotspot
+    let proximityLevel: Double
     @State private var vm: ContainmentViewModel
+    @State private var arTrackingMessage: String? = "Initializing AR…"
+    @State private var ghostScreenPosition: CGPoint?
     @Environment(\.dismiss) private var dismiss
 
-    init(hotspot: Hotspot) {
+    private let arSupported = ARWorldTrackingConfiguration.isSupported
+
+    init(hotspot: Hotspot, proximityLevel: Double) {
         self.hotspot = hotspot
+        self.proximityLevel = proximityLevel
         _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
     }
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            if arSupported {
+                ARContainerView(
+                    proximityLevel: proximityLevel,
+                    onTrackingMessage: { arTrackingMessage = $0 },
+                    onGhostScreenPosition: { ghostScreenPosition = $0 }
+                )
+                .ignoresSafeArea()
+            } else {
+                Color.black.ignoresSafeArea()
+                GridPattern()
+                    .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                    .ignoresSafeArea()
+            }
+
+            Color.black.opacity(0.45)
+                .ignoresSafeArea()
 
             GridPattern()
-                .stroke(Color.purple.opacity(0.15), lineWidth: 1)
+                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
                 .ignoresSafeArea()
 
             VStack {
-                // Top HUD: location label and countdown
                 HStack {
                     VStack(alignment: .leading) {
                         Text("CONTAINMENT")
@@ -223,20 +276,20 @@ struct ContainmentView: View {
                 }
                 .padding()
 
-                SealCanvas(points: vm.points) { point in
+                SealCanvas(points: vm.points, ghostPosition: ghostScreenPosition) { point in
                     vm.addPoint(point)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay(
-                    Text("Draw a seal to contain the ghost")
+                    Text(ghostScreenPosition != nil ? "Draw a seal AROUND the ghost" : "Waiting for ghost…")
                         .font(.caption)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .foregroundStyle(.white.opacity(0.6))
                         .padding(.bottom, 8),
                     alignment: .bottom
                 )
 
                 Button {
-                    vm.evaluateSeal()
+                    vm.evaluateSeal(ghostScreenPosition: ghostScreenPosition)
                 } label: {
                     Text("SEAL")
                         .font(.headline).bold()
@@ -247,6 +300,17 @@ struct ContainmentView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .padding()
+            }
+        }
+        .overlay(alignment: .top) {
+            if arSupported, let message = arTrackingMessage {
+                Text(message)
+                    .font(.caption).bold()
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .padding(.top, 60)
             }
         }
         .onAppear { vm.startTimer() }
@@ -271,7 +335,6 @@ struct ResultSheet: View {
 
     var body: some View {
         VStack(spacing: 24) {
-            // Outcome icon
             Image(systemName: outcome == .success ? "checkmark.seal.fill" : "xmark.seal.fill")
                 .font(.system(size: 64))
                 .foregroundStyle(outcome == .success ? .green : .red)
@@ -284,7 +347,6 @@ struct ResultSheet: View {
                 .font(.headline)
                 .foregroundStyle(.secondary)
 
-            // Reward breakdown
             VStack(spacing: 12) {
                 RewardRow(icon: "star.fill", label: "XP Earned", value: "+\(reward.xp) XP", color: .yellow)
 
@@ -317,7 +379,6 @@ struct ResultSheet: View {
     }
 }
 
-// A single line in the reward breakdown
 private struct RewardRow: View {
     let icon: String
     let label: String
@@ -344,10 +405,31 @@ private struct RewardRow: View {
 
 struct SealCanvas: View {
     let points: [SealPoint]
+    let ghostPosition: CGPoint?
     let onPoint: (SealPoint) -> Void
 
     var body: some View {
         Canvas { context, _ in
+            // Draw ghost target crosshair
+            if let ghost = ghostPosition {
+                let radius: CGFloat = 24
+                let crossLen: CGFloat = 10
+                // Pulsing ring around ghost
+                let ring = Path(ellipseIn: CGRect(
+                    x: ghost.x - radius, y: ghost.y - radius,
+                    width: radius * 2, height: radius * 2
+                ))
+                context.stroke(ring, with: .color(.purple.opacity(0.7)), lineWidth: 2)
+                // Small crosshair
+                var cross = Path()
+                cross.move(to: CGPoint(x: ghost.x - crossLen, y: ghost.y))
+                cross.addLine(to: CGPoint(x: ghost.x + crossLen, y: ghost.y))
+                cross.move(to: CGPoint(x: ghost.x, y: ghost.y - crossLen))
+                cross.addLine(to: CGPoint(x: ghost.x, y: ghost.y + crossLen))
+                context.stroke(cross, with: .color(.white.opacity(0.8)), lineWidth: 1.5)
+            }
+
+            // Draw the player's seal stroke
             guard points.count > 1 else { return }
             var path = Path()
             path.move(to: CGPoint(x: points[0].x, y: points[0].y))
@@ -363,29 +445,6 @@ struct SealCanvas: View {
                     onPoint(SealPoint(x: value.location.x, y: value.location.y))
                 }
         )
-        .background(Color.black.opacity(0.01))
-    }
-}
-
-// MARK: - Grid Pattern
-
-struct GridPattern: Shape {
-    // Draws an evenly spaced grid of lines across the available rect
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let spacing: CGFloat = 30
-        var x: CGFloat = 0
-        while x <= rect.width {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
-            x += spacing
-        }
-        var y: CGFloat = 0
-        while y <= rect.height {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
-            y += spacing
-        }
-        return path
+        .background(Color.clear)
     }
 }

@@ -9,7 +9,7 @@ import Observation
 import Supabase
 
 // MARK: - Hotspot model
-struct Hotspot: Identifiable, Decodable {
+struct Hotspot: Identifiable, Decodable, Hashable {
     let id: UUID
     let name: String
     let lat: Double
@@ -67,7 +67,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
             return distA < distB
         })
     }
-    
+
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
@@ -89,6 +89,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
 struct MapView: View {
     @State private var vm = MapViewModel()
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var selectedHotspot: Hotspot?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -97,10 +98,15 @@ struct MapView: View {
 
                 ForEach(vm.hotspots) { hotspot in
                     Annotation(hotspot.name, coordinate: hotspot.coordinate) {
-                        Image(systemName: "rays")
-                            .foregroundStyle(.purple)
-                            .padding(6)
-                            .background(.ultraThinMaterial, in: Circle())
+                        Button {
+                            selectedHotspot = hotspot
+                        } label: {
+                            Image(systemName: "rays")
+                                .foregroundStyle(.purple)
+                                .padding(6)
+                                .background(.ultraThinMaterial, in: Circle())
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -109,13 +115,36 @@ struct MapView: View {
                 MapCompass()
             }
             .ignoresSafeArea()
+            .navigationDestination(item: $selectedHotspot) { hotspot in
+                ScannerView(hotspot: hotspot)
+            }
+
+            if vm.hotspots.isEmpty, vm.errorText == nil {
+                Text("No hotspots loaded. Run docs/supabase-demo-setup.sql in Supabase, then refresh.")
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .padding()
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                    .padding()
+            }
 
             if let nearest = vm.nearestHotspot {
                 NearestAnomalySheet(hotspot: nearest)
                     .padding()
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedHotspot = nearest
+                    }
+            } else if !vm.hotspots.isEmpty {
+                Text("Tap a purple marker or move closer to an anomaly")
+                    .font(.caption)
+                    .padding(8)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.bottom, 24)
             }
 
-            if let error = vm.errorText {
+            if let error = vm.errorText, !error.isEmpty {
                 Text(error)
                     .font(.footnote)
                     .foregroundStyle(.white)

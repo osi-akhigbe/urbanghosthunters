@@ -8,7 +8,7 @@ import ARKit
 import RealityKit
 
 // MARK: - AR Session Delegate
-class GhostARSessionDelegate: NSObject, ARSessionDelegate  {
+class GhostARSessionDelegate: NSObject, ARSessionDelegate {
     var onTrackingStateChanged: ((String?) -> Void)?
 
     func session(_ session: ARSession, cameraDidChangeTrackingState camera: ARCamera) {
@@ -49,11 +49,12 @@ class GhostARSessionDelegate: NSObject, ARSessionDelegate  {
 // MARK: - AR Ghost View
 struct ARGhostView: UIViewRepresentable {
     var proximityLevel: Double
+    var onTrackingMessage: ((String?) -> Void)?
+    var onGhostScreenPosition: ((CGPoint) -> Void)?
 
     func makeUIView(context: Context) -> ARView {
         let arView = ARView(frame: .zero)
 
-        // Performance: disable unnecessary rendering features
         arView.renderOptions = [
             .disableDepthOfField,
             .disableMotionBlur,
@@ -63,21 +64,20 @@ struct ARGhostView: UIViewRepresentable {
 
         let config = ARWorldTrackingConfiguration()
         config.planeDetection = [.horizontal]
-
-        // Performance: disable environment texturing to save GPU
         config.environmentTexturing = .none
 
         arView.session.delegate = context.coordinator.sessionDelegate
         arView.session.run(config)
 
         // Ghost anchor 1.5m ahead, slightly below eye level
-        let anchor = AnchorEntity(world: [0, -0.5, -1.5])
+        let anchor = AnchorEntity(world: [0, -0.3, -1.5])
 
-        let ghostMesh = MeshResource.generateSphere(radius: 0.15)
-        let ghostMaterial = SimpleMaterial(
-            color: UIColor.purple.withAlphaComponent(0.8),
-            isMetallic: false
-        )
+        let ghostMesh = MeshResource.generateSphere(radius: 0.2)
+        var ghostMaterial = SimpleMaterial()
+        ghostMaterial.color = .init(tint: UIColor.purple.withAlphaComponent(0.85))
+        ghostMaterial.metallic = 0.0
+        ghostMaterial.roughness = 0.8
+
         let ghostEntity = ModelEntity(mesh: ghostMesh, materials: [ghostMaterial])
         anchor.addChild(ghostEntity)
         arView.scene.addAnchor(anchor)
@@ -85,10 +85,11 @@ struct ARGhostView: UIViewRepresentable {
         context.coordinator.ghostEntity = ghostEntity
         context.coordinator.arView = arView
 
-        // Handle tracking state changes
+        startFloatAnimation(ghostEntity)
+
         context.coordinator.sessionDelegate.onTrackingStateChanged = { message in
             DispatchQueue.main.async {
-                context.coordinator.trackingMessage = message
+                onTrackingMessage?(message)
             }
         }
 
@@ -96,15 +97,24 @@ struct ARGhostView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: ARView, context: Context) {
-        let scale = Float(0.5 + proximityLevel * 1.5)
-        context.coordinator.ghostEntity?.scale = [scale, scale, scale]
+        guard let ghostEntity = context.coordinator.ghostEntity else { return }
 
-        let alpha = CGFloat(0.3 + proximityLevel * 0.7)
-        let material = SimpleMaterial(
-            color: UIColor.purple.withAlphaComponent(alpha),
-            isMetallic: false
-        )
-        context.coordinator.ghostEntity?.model?.materials = [material]
+        // Scale and opacity grow with proximity
+        let scale = Float(0.6 + proximityLevel * 1.4)
+        ghostEntity.scale = [scale, scale, scale]
+
+        let alpha = CGFloat(0.4 + proximityLevel * 0.6)
+        var material = SimpleMaterial()
+        material.color = .init(tint: UIColor.purple.withAlphaComponent(alpha))
+        material.metallic = 0.0
+        material.roughness = 0.8
+        ghostEntity.model?.materials = [material]
+
+        // Project ghost world position to screen so the seal can target it
+        let worldPos = ghostEntity.position(relativeTo: nil)
+        if let screenPos = uiView.project(worldPos) {
+            onGhostScreenPosition?(screenPos)
+        }
     }
 
     func makeCoordinator() -> Coordinator {
@@ -114,8 +124,27 @@ struct ARGhostView: UIViewRepresentable {
     class Coordinator {
         var ghostEntity: ModelEntity?
         var arView: ARView?
-        var trackingMessage: String?
         let sessionDelegate = GhostARSessionDelegate()
+    }
+
+    // Float up/down relative to the anchor so there's no drift
+    private func startFloatAnimation(_ entity: ModelEntity) {
+        let up = Transform(translation: [0, 0.12, 0])
+        entity.move(to: up, relativeTo: entity.parent, duration: 1.2, timingFunction: .easeInOut)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak entity] in
+            guard let entity else { return }
+            loopFloat(entity, goingUp: false)
+        }
+    }
+
+    private func loopFloat(_ entity: ModelEntity, goingUp: Bool) {
+        let offset: Float = goingUp ? 0.12 : -0.12
+        let target = Transform(translation: [0, offset, 0])
+        entity.move(to: target, relativeTo: entity.parent, duration: 1.2, timingFunction: .easeInOut)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak entity] in
+            guard let entity else { return }
+            loopFloat(entity, goingUp: !goingUp)
+        }
     }
 }
 
