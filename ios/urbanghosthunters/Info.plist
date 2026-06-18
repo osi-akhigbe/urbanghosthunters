@@ -2,7 +2,6 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-<<<<<<< HEAD
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -15,14 +14,14 @@
 				<string>Urbanghosthunters</string>
 			</array>
 		</dict>
-=======
+	</array>
 	<key>UIBackgroundModes</key>
 	<array>
-		<string>NSBluetoothAlwaysUsageDescription → &quot;Urban Ghost Hunters uses Bluetooth to detect nearby agents.&quot;
-</string>
 		<string>bluetooth-central</string>
-		<string>NSBluetoothPeripheralUsageDescription → &quot;Urban Ghost Hunters uses Bluetooth to detect nearby agents.&quot;</string>
->>>>>>> origin/Osi/feature/APPDEV-49-ble-nearby-agents
 	</array>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>Urban Ghost Hunters uses Bluetooth to detect nearby agents.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>Urban Ghost Hunters uses Bluetooth to detect nearby agents.</string>
 </dict>
 </plist>
