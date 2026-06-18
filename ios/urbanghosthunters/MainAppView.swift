@@ -8,15 +8,13 @@ struct MainAppView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-
-            // MARK: Main content
             TabView {
                 MapView()
                     .tabItem {
                         Label("Map", systemImage: "map.fill")
                     }
 
-                Text("Journal")
+                JournalPlaceholderView()
                     .tabItem {
                         Label("Journal", systemImage: "book.fill")
                     }
@@ -26,8 +24,8 @@ struct MainAppView: View {
                         Label("Inventory", systemImage: "bag.fill")
                     }
             }
+            .tint(Kit.Colors.accent)
 
-            // MARK: Anomaly banner
             if let hotspot = geofence.nearbyHotspot, !bannerDismissed {
                 AnomalyBannerView(
                     hotspot:   hotspot,
@@ -42,11 +40,26 @@ struct MainAppView: View {
                 .animation(.spring(response: 0.4, dampingFraction: 0.75), value: geofence.nearbyHotspot?.id)
             }
         }
+        .kitScreen()
         .onAppear {
             geofence.start()
         }
         .onChange(of: geofence.nearbyHotspot?.id) { _ in
             bannerDismissed = false
         }
+    }
+}
+
+private struct JournalPlaceholderView: View {
+    var body: some View {
+        ZStack {
+            KitScreenBackground()
+            KitEmptyState(
+                icon: "book.closed",
+                title: "JOURNAL OFFLINE",
+                message: "Encounter logs will appear here after your first hunt."
+            )
+        }
+        .kitScreen()
     }
 }

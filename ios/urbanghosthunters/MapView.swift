@@ -8,7 +8,6 @@ import MapKit
 import Observation
 import Supabase
 
-// MARK: - Hotspot model
 struct Hotspot: Identifiable, Decodable {
     let id: UUID
     let name: String
@@ -23,7 +22,6 @@ struct Hotspot: Identifiable, Decodable {
     }
 }
 
-// MARK: - ViewModel
 @Observable
 @MainActor
 final class MapViewModel: NSObject, CLLocationManagerDelegate {
@@ -31,6 +29,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
     var userLocation: CLLocationCoordinate2D?
     var nearestHotspot: Hotspot?
     var errorText: String?
+    var isLoading = false
 
     private let locationManager = CLLocationManager()
 
@@ -43,6 +42,8 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
     }
 
     func fetchHotspots() async {
+        isLoading = true
+        defer { isLoading = false }
         do {
             let result: [Hotspot] = try await SupabaseManager.shared.client
                 .from("hotspots")
@@ -67,7 +68,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
             return distA < distB
         })
     }
-    
+
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didUpdateLocations locations: [CLLocation]) {
         guard let loc = locations.last else { return }
@@ -85,7 +86,6 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
     }
 }
 
-// MARK: - Map View
 struct MapView: View {
     @State private var vm = MapViewModel()
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
@@ -98,9 +98,10 @@ struct MapView: View {
                 ForEach(vm.hotspots) { hotspot in
                     Annotation(hotspot.name, coordinate: hotspot.coordinate) {
                         Image(systemName: "rays")
-                            .foregroundStyle(.purple)
-                            .padding(6)
-                            .background(.ultraThinMaterial, in: Circle())
+                            .foregroundStyle(Kit.Colors.accent)
+                            .padding(8)
+                            .background(Kit.Colors.background.opacity(0.85), in: Circle())
+                            .overlay(Circle().stroke(Kit.Colors.accent.opacity(0.5), lineWidth: 1))
                     }
                 }
             }
@@ -110,18 +111,26 @@ struct MapView: View {
             }
             .ignoresSafeArea()
 
+            if vm.isLoading {
+                VStack {
+                    KitLoadingView(message: "SCANNING SECTOR…")
+                        .padding(.top, 60)
+                    Spacer()
+                }
+            }
+
             if let nearest = vm.nearestHotspot {
                 NearestAnomalySheet(hotspot: nearest)
-                    .padding()
+                    .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
             }
 
             if let error = vm.errorText {
-                Text(error)
-                    .font(.footnote)
-                    .foregroundStyle(.white)
-                    .padding(8)
-                    .background(.red.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
-                    .padding(.bottom, 120)
+                VStack {
+                    Spacer()
+                    KitBanner(style: .error, title: "MAP ERROR", message: error)
+                        .padding(.bottom, vm.nearestHotspot == nil ? 32 : 120)
+                }
             }
         }
         .task {
@@ -130,33 +139,43 @@ struct MapView: View {
     }
 }
 
-// MARK: - Bottom sheet
 struct NearestAnomalySheet: View {
     let hotspot: Hotspot
 
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 14) {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.title2)
-                .foregroundStyle(.purple)
+                .foregroundStyle(Kit.Colors.signal)
+                .frame(width: 44, height: 44)
+                .background(Kit.Colors.signal.opacity(0.12), in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
 
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Nearest Anomaly")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("NEAREST ANOMALY")
+                    .font(Kit.Font.label())
+                    .foregroundStyle(Kit.Colors.label)
+                    .tracking(Kit.Layout.labelTracking)
+
                 Text(hotspot.name)
-                    .font(.headline)
-                Text("Difficulty \(hotspot.difficulty) · \(hotspot.radius_m)m radius")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .font(Kit.Font.title())
+                    .foregroundStyle(.white)
+
+                Text("DIFF \(hotspot.difficulty) · \(hotspot.radius_m)M RADIUS")
+                    .font(Kit.Font.label())
+                    .foregroundStyle(Kit.Colors.muted)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .foregroundStyle(.secondary)
+                .font(.caption.weight(.bold))
+                .foregroundStyle(Kit.Colors.muted)
         }
-        .padding()
-        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 16))
+        .padding(Kit.Layout.panelPadding)
+        .background(Kit.Colors.panel, in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                .stroke(Kit.Colors.panelBorder, lineWidth: 1)
+        )
     }
 }

@@ -2,8 +2,6 @@
 //  AuthView.swift
 //  urbanghosthunters
 //
-//  Created by Jarvis Akhigbe on 10/05/2026.
-//
 
 import SwiftUI
 import Supabase
@@ -14,59 +12,90 @@ struct AuthView: View {
     @State private var otp = ""
     @State private var isWaitingForOTP = false
     @State private var errorText: String?
+    @State private var isSigningIn = false
 
     var body: some View {
-        VStack(spacing: 16) {
-            Text("Auth").font(.title2).bold()
+        ZStack {
+            KitScreenBackground()
 
-            if let uid = supa.userId {
-                Text("Signed in as:")
-                Text(uid).font(.footnote).textSelection(.enabled)
-            } else {
-                Text("Not signed in").foregroundStyle(.secondary)
-            }
+            ScrollView {
+                VStack(spacing: 28) {
+                    VStack(spacing: 8) {
+                        Image(systemName: "figure.walk.motion")
+                            .font(.system(size: 44))
+                            .foregroundStyle(Kit.Colors.accent)
 
-            Divider()
+                        Text("URBAN GHOST HUNTER")
+                            .font(Kit.Font.module())
+                            .foregroundStyle(Kit.Colors.accent)
+                            .tracking(2)
 
-            Button("Continue as Guest") {
-                Task { await signInAnonymously() }
-            }
-            .buttonStyle(.borderedProminent)
+                        Text("Field kit authentication")
+                            .font(Kit.Font.body())
+                            .foregroundStyle(Kit.Colors.label)
+                    }
+                    .padding(.top, 40)
 
-            Divider()
+                    if let uid = supa.userId {
+                        KitPanel {
+                            VStack(alignment: .leading, spacing: 8) {
+                                KitSectionLabel(text: "OPERATOR ID")
+                                Text(uid)
+                                    .font(Kit.Font.label())
+                                    .foregroundStyle(Kit.Colors.signal)
+                                    .textSelection(.enabled)
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
 
-            TextField("Email", text: $email)
-                .textInputAutocapitalization(.never)
-                .keyboardType(.emailAddress)
-                .textFieldStyle(.roundedBorder)
+                    KitPanel {
+                        VStack(spacing: 16) {
+                            KitPrimaryButton(title: "CONTINUE AS GUEST") {
+                                Task { await signInAnonymously() }
+                            }
+                            .disabled(isSigningIn)
 
-            if isWaitingForOTP {
-                TextField("OTP code", text: $otp)
-                    .keyboardType(.numberPad)
-                    .textFieldStyle(.roundedBorder)
+                            if isSigningIn {
+                                KitLoadingView(message: "AUTHENTICATING…")
+                            }
+                        }
+                    }
 
-                Button("Verify OTP") {
-                    Task { await verifyOTP() }
+                    KitPanel {
+                        VStack(spacing: 16) {
+                            KitSectionLabel(text: "EMAIL ACCESS")
+
+                            KitTextField(label: "EMAIL", text: $email, keyboard: .emailAddress)
+
+                            if isWaitingForOTP {
+                                KitTextField(label: "OTP CODE", text: $otp, keyboard: .numberPad)
+                                KitPrimaryButton(title: "VERIFY OTP") {
+                                    Task { await verifyOTP() }
+                                }
+                            } else {
+                                KitPrimaryButton(title: "SEND OTP") {
+                                    Task { await sendOTP() }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    if let errorText {
+                        KitBanner(style: .error, title: "AUTH FAILED", message: errorText)
+                    }
                 }
-                .buttonStyle(.borderedProminent)
-            } else {
-                Button("Send OTP") {
-                    Task { await sendOTP() }
-                }
-                .buttonStyle(.bordered)
+                .padding(20)
             }
-
-            if let errorText {
-                Text(errorText).foregroundStyle(.red).font(.footnote)
-            }
-
-            Spacer()
         }
-        .padding()
+        .kitScreen()
     }
 
     @MainActor
     private func signInAnonymously() async {
+        isSigningIn = true
+        defer { isSigningIn = false }
         do {
             errorText = nil
             _ = try await supa.client.auth.signInAnonymously()

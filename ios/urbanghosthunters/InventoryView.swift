@@ -6,55 +6,54 @@ struct InventoryView: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.black.ignoresSafeArea()
+                KitScreenBackground()
 
                 if vm.isLoading {
-                    ProgressView()
-                        .tint(.purple)
+                    KitLoadingView(message: "LOADING TOTEMS…")
                 } else {
                     ScrollView {
-                        VStack(alignment: .leading, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 28) {
                             EquippedSlotsSection(equipped: vm.equippedTotems)
                             TotemListSection(totems: vm.totems, onTap: { totem in
                                 Task { await vm.toggleEquip(totem) }
                             })
                         }
-                        .padding()
+                        .padding(16)
                     }
                 }
 
                 if let error = vm.errorText {
                     VStack {
                         Spacer()
-                        Text(error)
-                            .font(.footnote)
-                            .foregroundStyle(.white)
-                            .padding(8)
-                            .background(.red.opacity(0.8), in: RoundedRectangle(cornerRadius: 8))
+                        KitBanner(style: .error, title: "SYNC ERROR", message: error)
                             .padding(.bottom, 16)
                     }
                 }
             }
-            .navigationTitle("Inventory")
+            .kitScreen()
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("INVENTORY")
+                        .font(Kit.Font.module())
+                        .foregroundStyle(Kit.Colors.accent)
+                        .tracking(Kit.Layout.labelTracking)
+                }
+            }
+            .toolbarBackground(Kit.Colors.background, for: .navigationBar)
+            .toolbarBackground(.visible, for: .navigationBar)
         }
-        // Fetch totems as soon as the view appears
         .task { await vm.fetch() }
     }
 }
 
-// MARK: - Equipped Slots
-
-// Shows one slot per totem type; filled slots display the totem icon
 private struct EquippedSlotsSection: View {
     let equipped: [Totem]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("EQUIPPED")
-                .font(.caption).bold()
-                .foregroundStyle(.purple)
+        VStack(alignment: .leading, spacing: 14) {
+            KitSectionLabel(text: "EQUIPPED")
 
             HStack(spacing: 12) {
                 ForEach(TotemType.allCases, id: \.self) { type in
@@ -66,60 +65,50 @@ private struct EquippedSlotsSection: View {
     }
 }
 
-// Single equipment slot — shows the icon when filled, a plus when empty
 private struct EquippedSlot: View {
     let type: TotemType
     let isOccupied: Bool
 
     var body: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 8) {
             ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(isOccupied ? Color.purple : Color.white.opacity(0.15), lineWidth: 1.5)
+                RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                    .fill(isOccupied ? Kit.Colors.accent.opacity(0.12) : Kit.Colors.panel)
                     .frame(width: 72, height: 72)
-                    .background(
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(isOccupied ? Color.purple.opacity(0.15) : Color.white.opacity(0.05))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                            .stroke(isOccupied ? Kit.Colors.accent : Kit.Colors.panelBorder, lineWidth: 1.5)
                     )
 
-                if isOccupied {
-                    Image(systemName: type.icon)
-                        .font(.title2)
-                        .foregroundStyle(.purple)
-                } else {
-                    Image(systemName: "plus")
-                        .font(.title3)
-                        .foregroundStyle(.white.opacity(0.2))
-                }
+                Image(systemName: isOccupied ? type.icon : "plus")
+                    .font(.title2)
+                    .foregroundStyle(isOccupied ? Kit.Colors.accent : Kit.Colors.muted)
             }
 
-            Text(isOccupied ? type.displayName : "Empty")
-                .font(.caption2)
-                .foregroundStyle(isOccupied ? .white : .white.opacity(0.3))
+            Text(isOccupied ? type.displayName : "EMPTY")
+                .font(Kit.Font.label())
+                .foregroundStyle(isOccupied ? .white : Kit.Colors.muted)
                 .lineLimit(1)
                 .frame(width: 72)
         }
     }
 }
 
-// MARK: - Totem List
-
-// Lists all totems the user owns with an equip / unequip button on each
 private struct TotemListSection: View {
     let totems: [Totem]
     let onTap: (Totem) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("TOTEMS")
-                .font(.caption).bold()
-                .foregroundStyle(.purple)
+        VStack(alignment: .leading, spacing: 14) {
+            KitSectionLabel(text: "TOTEMS")
 
             if totems.isEmpty {
-                Text("No totems found.")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .padding(.vertical, 8)
+                KitEmptyState(
+                    icon: "backpack",
+                    title: "NO TOTEMS",
+                    message: "Complete encounters to collect gear."
+                )
+                .frame(maxWidth: .infinity)
             } else {
                 ForEach(totems) { totem in
                     TotemRow(totem: totem, onTap: { onTap(totem) })
@@ -129,41 +118,49 @@ private struct TotemListSection: View {
     }
 }
 
-// A single row showing the totem icon, name, effect description, and equip toggle
 private struct TotemRow: View {
     let totem: Totem
     let onTap: () -> Void
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 16) {
+            HStack(spacing: 14) {
                 Image(systemName: totem.type.icon)
                     .font(.title2)
-                    .foregroundStyle(.purple)
-                    .frame(width: 40, height: 40)
-                    .background(Color.purple.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+                    .foregroundStyle(Kit.Colors.accent)
+                    .frame(width: 44, height: 44)
+                    .background(Kit.Colors.accent.opacity(0.1), in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
 
-                VStack(alignment: .leading, spacing: 2) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(totem.type.displayName)
-                        .font(.headline)
+                        .font(Kit.Font.title())
                         .foregroundStyle(.white)
                     Text(totem.type.effectDescription)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .font(Kit.Font.label())
+                        .foregroundStyle(Kit.Colors.label)
                 }
 
                 Spacer()
 
-                Text(totem.equipped ? "Equipped" : "Equip")
-                    .font(.caption).bold()
-                    .foregroundStyle(totem.equipped ? .black : .purple)
+                Text(totem.equipped ? "EQUIPPED" : "EQUIP")
+                    .font(Kit.Font.label())
+                    .foregroundStyle(totem.equipped ? Kit.Colors.background : Kit.Colors.accent)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
-                    .background(totem.equipped ? Color.purple : Color.purple.opacity(0.15),
-                                in: Capsule())
+                    .background(
+                        totem.equipped ? Kit.Colors.accent : Kit.Colors.accent.opacity(0.12),
+                        in: Capsule()
+                    )
+                    .overlay(
+                        Capsule().stroke(Kit.Colors.accent.opacity(totem.equipped ? 0 : 0.4), lineWidth: 1)
+                    )
             }
-            .padding()
-            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+            .padding(Kit.Layout.panelPadding)
+            .background(Kit.Colors.panel, in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                    .stroke(Kit.Colors.panelBorder, lineWidth: 1)
+            )
         }
         .buttonStyle(.plain)
     }

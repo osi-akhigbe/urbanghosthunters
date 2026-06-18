@@ -136,6 +136,10 @@ struct ContainmentView: View {
     @State private var vm: ContainmentViewModel
     @Environment(\.dismiss) private var dismiss
 
+    private var timerColor: Color {
+        vm.timeRemaining <= 3 ? Kit.Colors.danger : Kit.Colors.signal
+    }
+
     init(hotspot: Hotspot) {
         self.hotspot = hotspot
         _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
@@ -143,73 +147,59 @@ struct ContainmentView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            KitScreenBackground()
 
-            GridPattern()
-                .stroke(Color.purple.opacity(0.15), lineWidth: 1)
-                .ignoresSafeArea()
-
-            VStack {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("CONTAINMENT")
-                            .font(.caption).bold()
-                            .foregroundStyle(.purple)
-                        Text(hotspot.name)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                    }
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(vm.timeRemaining)s")
-                            .font(.title).bold()
-                            .foregroundStyle(vm.timeRemaining <= 3 ? .red : .green)
-                            .monospacedDigit()
-
-                        let bonus = InventoryViewModel.shared.effects.sealTimeBonus
-                        if bonus > 0 {
-                            Text("+\(bonus)s from totem")
-                                .font(.caption2)
-                                .foregroundStyle(.purple)
-                        }
-                    }
-                }
-                .padding()
+            VStack(spacing: 0) {
+                KitHUDHeader(
+                    module: "CONTAINMENT",
+                    title: hotspot.name,
+                    subtitle: timerSubtitle,
+                    readout: .init(
+                        label: "SEAL TIMER",
+                        value: "\(vm.timeRemaining)s",
+                        valueColor: timerColor
+                    )
+                )
 
                 SealCanvas(points: vm.points) { point in
                     vm.addPoint(point)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(
-                    Text("Draw a seal to contain the ghost")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.4))
-                        .padding(.bottom, 8),
-                    alignment: .bottom
-                )
-
-                Button {
-                    vm.evaluateSeal()
-                } label: {
-                    Text("SEAL")
-                        .font(.headline).bold()
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(.purple)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .overlay(alignment: .bottom) {
+                    Text("DRAW A SEAL TO CONTAIN THE GHOST")
+                        .font(Kit.Font.label())
+                        .foregroundStyle(Kit.Colors.muted)
+                        .tracking(Kit.Layout.labelTracking)
+                        .padding(.bottom, 12)
                 }
-                .padding()
+
+                KitPrimaryButton(title: "SEAL") {
+                    vm.evaluateSeal()
+                }
+                .padding(16)
             }
         }
+        .kitScreen()
         .onAppear { vm.startTimer() }
         .onDisappear { vm.stopTimer() }
         .sheet(isPresented: $vm.showResult) {
-            ResultSheet(outcome: vm.outcome, hotspot: hotspot) {
+            KitOutcomeSheet(
+                success: vm.outcome == .success,
+                title: vm.outcome == .success ? "GHOST CONTAINED" : "CONTAINMENT FAILED",
+                subtitle: hotspot.name,
+                reward: vm.outcome == .success ? "+100 XP" : "+10 XP",
+                buttonTitle: "CONTINUE"
+            ) {
                 dismiss()
             }
         }
+    }
+
+    private var timerSubtitle: String? {
+        let bonus = InventoryViewModel.shared.effects.sealTimeBonus
+        guard bonus > 0 else { return nil }
+        return "+\(bonus)S TOTEM BONUS"
     }
 }
 
@@ -225,36 +215,21 @@ struct SealCanvas: View {
             for point in points.dropFirst() {
                 path.addLine(to: CGPoint(x: point.x, y: point.y))
             }
-            context.stroke(path, with: .color(.purple), lineWidth: 3)
-            context.stroke(path, with: .color(.purple.opacity(0.3)), lineWidth: 8)
+            context.stroke(path, with: .color(Kit.Colors.accent.opacity(0.35)), lineWidth: 10)
+            context.stroke(path, with: .color(Kit.Colors.accent), lineWidth: 3)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Kit.Colors.panel, in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
+        .overlay(
+            RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                .stroke(Kit.Colors.panelBorder, lineWidth: 1)
+        )
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
                     onPoint(SealPoint(x: value.location.x, y: value.location.y))
                 }
         )
-        .background(Color.black.opacity(0.01))
-    }
-}
-
-struct GridPattern: Shape {
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let spacing: CGFloat = 30
-        var x: CGFloat = 0
-        while x <= rect.width {
-            path.move(to: CGPoint(x: x, y: 0))
-            path.addLine(to: CGPoint(x: x, y: rect.height))
-            x += spacing
-        }
-        var y: CGFloat = 0
-        while y <= rect.height {
-            path.move(to: CGPoint(x: 0, y: y))
-            path.addLine(to: CGPoint(x: rect.width, y: y))
-            y += spacing
-        }
-        return path
     }
 }
 
@@ -264,30 +239,13 @@ struct ResultSheet: View {
     let onDismiss: () -> Void
 
     var body: some View {
-        VStack(spacing: 24) {
-            Image(systemName: outcome == .success ? "checkmark.seal.fill" : "xmark.seal.fill")
-                .font(.system(size: 64))
-                .foregroundStyle(outcome == .success ? .green : .red)
-
-            Text(outcome == .success ? "Ghost Contained!" : "Containment Failed")
-                .font(.title2).bold()
-                .foregroundStyle(outcome == .success ? .green : .red)
-
-            Text(hotspot.name)
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Text(outcome == .success ? "+100 XP" : "+10 XP")
-                .font(.title3).bold()
-                .foregroundStyle(.purple)
-
-            Button("Continue") {
-                onDismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
-        }
-        .padding()
-        .presentationDetents([.medium])
+        KitOutcomeSheet(
+            success: outcome == .success,
+            title: outcome == .success ? "GHOST CONTAINED" : "CONTAINMENT FAILED",
+            subtitle: hotspot.name,
+            reward: outcome == .success ? "+100 XP" : "+10 XP",
+            buttonTitle: "CONTINUE",
+            onDismiss: onDismiss
+        )
     }
 }
