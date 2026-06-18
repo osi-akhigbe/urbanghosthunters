@@ -4,10 +4,7 @@
 //
 
 import SwiftUI
-<<<<<<< HEAD
-=======
 import Supabase
->>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual
 
 struct CoopRitualView: View {
     let hotspot: Hotspot
@@ -299,51 +296,6 @@ struct JoinSessionSheet: View {
     }
 }
 
-<<<<<<< HEAD
-// MARK: - Grant rewards + shared journal entry
-func completeRitual(hotspotId: UUID) async {
-    guard let session else { return }
-    guard let userId = SupabaseManager.shared.client.auth.currentUser?.id else { return }
-
-    struct EncounterInsert: Encodable {
-        let user_id: UUID
-        let hotspot_id: UUID
-        let outcome: String
-        let rewards_json: RewardsJSON
-    }
-
-    struct RewardsJSON: Encodable {
-        let xp: Int
-        let coop: Bool
-        let partner_id: String
-    }
-
-    let partnerId = isHost ? session.guest_id?.uuidString ?? "" : session.host_id.uuidString
-    let xp = 150 // co-op bonus XP
-
-    let insert = EncounterInsert(
-        user_id: userId,
-        hotspot_id: hotspotId,
-        outcome: "captured",
-        rewards_json: RewardsJSON(xp: xp, coop: true, partner_id: partnerId)
-    )
-
-    do {
-        try await SupabaseManager.shared.client
-            .from("encounters")
-            .insert(insert)
-            .execute()
-
-        await advanceStatus(to: .complete)
-        await PlayerInventory.shared.grantTotemIfNeeded(totemName: "Spirit Ward")
-    } catch {
-        ErrorLogger.shared.log(error, context: "CoopSessionManager.completeRitual")
-        errorText = error.localizedDescription
-    }
-}
-
-=======
->>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual
 // MARK: - Coop Seal Canvas
 struct CoopSealCanvas: View {
     let onComplete: () -> Void
@@ -386,8 +338,4 @@ struct CoopSealCanvas: View {
             }
         }
     }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> origin/Osi/feature/APPDEV-50-coop-ritual
