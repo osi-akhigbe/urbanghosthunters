@@ -1,0 +1,15 @@
+-- No schema changes needed; rewards_json is already JSONB.
+-- Documents the expected shape written by the iOS app after this update:
+--
+-- Success:
+--   { "xp": 150, "totem_shards": 3, "totem_granted": "seal_stability" }
+--
+-- Failure:
+--   { "xp": 10,  "totem_shards": 0, "totem_granted": null }
+--
+-- XP scale by difficulty (success only):
+--   1 → 50 XP   | 0 shards | no totem
+--   2 → 75 XP   | 1 shard  | no totem
+--   3 → 100 XP  | 2 shards | no totem
+--   4 → 150 XP  | 3 shards | 50 % chance of totem
+--   5 → 200 XP  | 3 shards | guaranteed totem
