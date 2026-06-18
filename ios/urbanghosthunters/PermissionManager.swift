@@ -7,6 +7,7 @@ import Foundation
 import CoreLocation
 import AVFoundation
 import UserNotifications
+import Supabase
 
 @Observable
 @MainActor
