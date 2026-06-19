@@ -23,53 +23,51 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
     private var hapticTimer: Timer?
     let hotspot: Hotspot
 
-init(hotspot: Hotspot) {
-    self.hotspot = hotspot
-    super.init()
-    locationManager.delegate = self
-    locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters // start coarse
-    locationManager.distanceFilter = 5 // only update every 5 metres
-    locationManager.headingFilter = 3 // only update heading every 3 degrees
-    locationManager.startUpdatingLocation()
-    locationManager.startUpdatingHeading()
-    prepareHaptics()
+    init(hotspot: Hotspot) {
+        self.hotspot = hotspot
+        super.init()
+        locationManager.delegate = self
+        locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+        locationManager.distanceFilter = 5
+        locationManager.headingFilter = 3
+        locationManager.startUpdatingLocation()
+        locationManager.startUpdatingHeading()
+        prepareHaptics()
 
-    // Stop sensors when app goes to background
-    NotificationCenter.default.addObserver(
-        forName: UIApplication.didEnterBackgroundNotification,
-        object: nil,
-        queue: .main
-    ) { [weak self] _ in
-        self?.pauseSensors()
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.pauseSensors()
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.resumeSensors()
+        }
     }
 
-    // Resume when app comes back
-    NotificationCenter.default.addObserver(
-        forName: UIApplication.willEnterForegroundNotification,
-        object: nil,
-        queue: .main
-    ) { [weak self] _ in
-        self?.resumeSensors()
+    func stop() {
+        locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
+        stopHaptics()
+        NotificationCenter.default.removeObserver(self)
     }
-}
 
-func stop() {
-    locationManager.stopUpdatingLocation()
-    locationManager.stopUpdatingHeading()
-    stopHaptics()
-    NotificationCenter.default.removeObserver(self)
-}
+    func pauseSensors() {
+        locationManager.stopUpdatingLocation()
+        locationManager.stopUpdatingHeading()
+        stopHaptics()
+    }
 
-func pauseSensors() {
-    locationManager.stopUpdatingLocation()
-    locationManager.stopUpdatingHeading()
-    stopHaptics()
-}
-
-func resumeSensors() {
-    locationManager.startUpdatingLocation()
-    locationManager.startUpdatingHeading()
-}
+    func resumeSensors() {
+        locationManager.startUpdatingLocation()
+        locationManager.startUpdatingHeading()
+    }
 
     private func bearingTo(lat: Double, lng: Double, from userLat: Double, userLng: Double) -> Double {
         let dLng = (lng - userLng) * .pi / 180
@@ -81,7 +79,25 @@ func resumeSensors() {
         return (bearing + 360).truncatingRemainder(dividingBy: 360)
     }
 
-  
+    nonisolated func locationManager(_ manager: CLLocationManager,
+                                     didUpdateLocations locations: [CLLocation]) {
+        guard let loc = locations.last else { return }
+        Task { @MainActor in
+            let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
+            let distance = loc.distance(from: hotspotLoc)
+            self.distanceMeters = distance
+            self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
+            self.updateHapticRate()
+
+            if distance > 100 {
+                manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+                manager.distanceFilter = 10
+            } else {
+                manager.desiredAccuracy = kCLLocationAccuracyBest
+                manager.distanceFilter = 2
+            }
+        }
+    }
 
     nonisolated func locationManager(_ manager: CLLocationManager,
                                      didUpdateHeading newHeading: CLHeading) {
@@ -104,27 +120,6 @@ func resumeSensors() {
                                      didFailWithError error: Error) {
         Task { @MainActor in self.errorText = error.localizedDescription }
     }
-
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                 didUpdateLocations locations: [CLLocation]) {
-    guard let loc = locations.last else { return }
-    Task { @MainActor in
-        let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
-        let distance = loc.distance(from: hotspotLoc)
-        self.distanceMeters = distance
-        self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
-        self.updateHapticRate()
-
-        // Dynamically adjust accuracy based on distance
-        if distance > 100 {
-            manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-            manager.distanceFilter = 10
-        } else {
-            manager.desiredAccuracy = kCLLocationAccuracyBest
-            manager.distanceFilter = 2
-        }
-    }
-}
 
     func prepareHaptics() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
@@ -171,8 +166,17 @@ struct ScannerView: View {
     @State private var showCoop = false
     @Environment(\.dismiss) private var dismiss
 
+    private var containmentThreshold: Double {
+        let reduction = InventoryViewModel.shared.effects.cooldownReduction
+        return max(0.15, 0.3 - reduction * 0.15)
+    }
+
     private var canBeginContainment: Bool {
-        vm.proximityLevel > 0.3 || micLure.revealLevel >= 0.55
+        vm.proximityLevel >= containmentThreshold || micLure.revealLevel >= 0.55
+    }
+
+    private var combinedSignal: Double {
+        (vm.proximityLevel + vm.headingAlignment) / 2
     }
 
     init(hotspot: Hotspot) {
@@ -182,244 +186,156 @@ struct ScannerView: View {
 
     var body: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
+            KitScreenBackground()
 
-            GridPattern()
-                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
+            GhostARView(proximityLevel: vm.proximityLevel)
                 .ignoresSafeArea()
+                .allowsHitTesting(false)
 
-
-.fullScreenCover(isPresented: $showCoop) {
-    CoopRitualView(hotspot: hotspot)
-}
             VStack(spacing: 0) {
+                KitHUDHeader(
+                    module: "SCANNER",
+                    title: hotspot.name,
+                    subtitle: "DIFFICULTY \(hotspot.difficulty)",
+                    readout: .init(
+                        label: "DISTANCE",
+                        value: "\(Int(vm.distanceMeters))m",
+                        valueColor: Kit.Colors.signal
+                    )
+                )
 
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("SCANNER")
-                            .font(.caption).bold()
-                            .foregroundStyle(.purple)
-                        Text(hotspot.name)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                        Text("Difficulty \(hotspot.difficulty)")
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.5))
-                    }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(Int(vm.distanceMeters))m")
-                            .font(.title2).bold()
-                            .foregroundStyle(.green)
-                            .monospacedDigit()
-                        Text("DISTANCE")
-                            .font(.caption2)
-                            .foregroundStyle(.white.opacity(0.5))
+                Spacer()
+
+                KitPanel {
+                    VStack(spacing: 20) {
+                        KitCompassMeter(alignment: vm.headingAlignment, degrees: vm.headingDegrees)
+                        KitProximityMeter(level: vm.proximityLevel)
+                        KitSignalBars(level: combinedSignal, label: "COMBINED SIGNAL")
                     }
                 }
-                .padding()
+                .padding(.horizontal, 16)
 
                 Spacer()
 
                 VStack(spacing: 8) {
-                    Text("HEADING ALIGNMENT")
-                        .font(.caption2).bold()
-                        .foregroundStyle(.white.opacity(0.5))
-                        .tracking(2)
-                    CompassMeter(alignment: vm.headingAlignment, degrees: vm.headingDegrees)
-                        .frame(height: 60)
-                        .padding(.horizontal)
-                }
-
-                Spacer()
-
-                VStack(spacing: 8) {
-                    Text("PROXIMITY SIGNAL")
-                        .font(.caption2).bold()
-                        .foregroundStyle(.white.opacity(0.5))
-                        .tracking(2)
-                    ProximityMeter(level: vm.proximityLevel)
-                        .frame(height: 24)
-                        .padding(.horizontal)
-                }
-
-                // Mic lure (APPDEV-32)
-                VStack(spacing: 8) {
-                    Text("GHOST REVEAL")
-                        .font(.caption2).bold()
-                        .foregroundStyle(.white.opacity(0.5))
-                    ProximityMeter(level: micLure.revealLevel)
-                        .frame(height: 20)
-                        .padding(.horizontal)
+                    KitMeterBar(label: "GHOST REVEAL", level: micLure.revealLevel, tint: Kit.Colors.signal)
                     Text("Hold to lure — louder = faster reveal")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.4))
+                        .font(Kit.Font.label())
+                        .foregroundStyle(Kit.Colors.muted)
                     MicLureButton(micLure: micLure)
-                        .padding(.horizontal)
                 }
-                .padding(.vertical, 8)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 12)
 
-                Spacer()
-
-                HStack(spacing: 4) {
-                    ForEach(0..<8, id: \.self) { i in
-                        let combined = (vm.proximityLevel + vm.headingAlignment) / 2
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Double(i) / 8.0 < combined ? Color.green : Color.white.opacity(0.1))
-                            .frame(width: 20, height: Double(i + 1) * 4 + 8)
-                    }
+                Button {
+                    showCoop = true
+                } label: {
+                    Label("CO-OP RITUAL", systemImage: "person.2.fill")
+                        .font(Kit.Font.label())
+                        .foregroundStyle(Kit.Colors.accent)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Kit.Colors.accent.opacity(0.12))
+                        .clipShape(RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
                 }
-                .padding()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
 
-                Spacer()
-
-Button {
-    showCoop = true
-} label: {
-    Label("CO-OP RITUAL", systemImage: "person.2.fill")
-        .font(.caption).bold()
-        .foregroundStyle(.purple)
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(Color.purple.opacity(0.15))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-}
-.padding(.horizontal)
-
-                // Nearby agents
                 NearbyAgentsView()
                     .padding(.horizontal)
                     .padding(.bottom, 8)
-                
-                Button {
-                    showContainment = true
-                } label: {
-                    Text("BEGIN CONTAINMENT")
-                        .font(.headline).bold()
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(canBeginContainment ? Color.purple : Color.gray.opacity(0.3))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .disabled(!canBeginContainment)
-                .padding()
 
-                if !canBeginContainment {
-                    VStack(spacing: 8) {
-                        Text("Get closer to begin containment")
-                            .font(.caption)
-                            .foregroundStyle(.white.opacity(0.4))
+                VStack(spacing: 8) {
+                    KitPrimaryButton(
+                        title: "BEGIN CONTAINMENT",
+                        enabled: canBeginContainment
+                    ) {
+                        showContainment = true
+                    }
+
+                    if !canBeginContainment {
+                        Text("GET CLOSER TO BEGIN CONTAINMENT")
+                            .font(Kit.Font.label())
+                            .foregroundStyle(Kit.Colors.muted)
+                            .tracking(Kit.Layout.labelTracking)
 
                         Button("Demo: start containment anyway") {
                             showContainment = true
                         }
                         .font(.caption)
-                        .foregroundStyle(.purple)
+                        .foregroundStyle(Kit.Colors.accent)
                     }
-                    .padding(.bottom, 8)
                 }
+                .padding(16)
+            }
+
+            if let error = vm.errorText {
+                VStack {
+                    KitBanner(style: .error, title: "SENSOR ERROR", message: error)
+                    Spacer()
+                }
+                .padding(.top, 8)
             }
         }
+        .fullScreenCover(isPresented: $showCoop) {
+            CoopRitualView(hotspot: hotspot)
+        }
+        .fullScreenCover(isPresented: $showContainment) {
+            ContainmentView(hotspot: hotspot)
+        }
+        .kitScreen()
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
-                Button("← Exit") { dismiss() }
-                    .foregroundStyle(.purple)
+                KitGhostButton(title: "← EXIT") { dismiss() }
             }
         }
         .onAppear {
-    micLure.prepare()
-    audioStatic.prepare()
-}
-.onChange(of: vm.proximityLevel) { _, newValue in
-    audioStatic.setProximity(newValue)
-}
+            micLure.prepare()
+            audioStatic.prepare()
+        }
+        .onChange(of: vm.proximityLevel) { _, newValue in
+            audioStatic.setProximity(newValue)
+        }
         .onDisappear {
-    vm.stop()
-    micLure.stop()
-    audioStatic.stop()
-}
-    .fullScreenCover(isPresented: $showContainment) {
-    ContainmentView(hotspot: hotspot, proximityLevel: vm.proximityLevel)
-}
-}
-}
-
-// MARK: - Compass Meter
-struct CompassMeter: View {
-    let alignment: Double
-    let degrees: Double
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.05))
-                    .frame(height: 8)
-
-                HStack {
-                    RoundedRectangle(cornerRadius: 4)
-                        .fill(LinearGradient(colors: [.purple.opacity(0.5), .purple],
-                                             startPoint: .leading, endPoint: .trailing))
-                        .frame(width: geo.size.width * alignment, height: 8)
-                    Spacer(minLength: 0)
-                }
-
-                HStack {
-                    Spacer()
-                    Text("\(Int(degrees))°")
-                        .font(.caption2.monospacedDigit())
-                        .foregroundStyle(.white.opacity(0.6))
-                        .padding(.trailing, 4)
-                }
-            }
+            vm.stop()
+            micLure.stop()
+            audioStatic.stop()
         }
     }
 }
 
-struct MicLureButton: View {
+private struct MicLureButton: View {
     let micLure: MicLureManager
+    @State private var isHolding = false
 
     var body: some View {
-        Text(micLure.isHolding ? "LURING…" : "HOLD TO LURE")
-            .font(.headline).bold()
-            .foregroundStyle(.white)
+        Label(isHolding ? "LURING…" : "HOLD TO LURE", systemImage: "mic.fill")
+            .font(Kit.Font.module())
+            .tracking(1)
+            .foregroundStyle(isHolding ? Kit.Colors.background : Kit.Colors.accent)
             .frame(maxWidth: .infinity)
-            .padding()
-            .background(micLure.isHolding ? Color.green.opacity(0.8) : Color.purple.opacity(0.6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.vertical, 14)
+            .background(
+                isHolding ? Kit.Colors.accent : Kit.Colors.accent.opacity(0.12),
+                in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                    .stroke(Kit.Colors.accent.opacity(0.5), lineWidth: 1)
+            )
             .gesture(
                 DragGesture(minimumDistance: 0)
                     .onChanged { _ in
-                        if !micLure.isHolding { micLure.beginLure() }
+                        if !isHolding {
+                            isHolding = true
+                            micLure.beginLure()
+                        }
                     }
-                    .onEnded { _ in micLure.endLure() }
+                    .onEnded { _ in
+                        isHolding = false
+                        micLure.endLure()
+                    }
             )
-    }
-}
-
-// MARK: - Proximity Meter
-struct ProximityMeter: View {
-    let level: Double
-
-    private var meterColor: Color {
-        if level > 0.7 { return .green }
-        if level > 0.4 { return .yellow }
-        return .red
-    }
-
-    var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.white.opacity(0.05))
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(LinearGradient(colors: [meterColor.opacity(0.6), meterColor],
-                                         startPoint: .leading, endPoint: .trailing))
-                    .frame(width: geo.size.width * level)
-                    .animation(.easeInOut(duration: 0.3), value: level)
-            }
-        }
     }
 }

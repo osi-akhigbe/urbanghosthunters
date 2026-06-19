@@ -1,7 +1,6 @@
 import SwiftUI
 import CoreHaptics
 import Supabase
-import ARKit
 
 struct SealPoint: Equatable {
     let x: CGFloat
@@ -54,7 +53,6 @@ final class ContainmentViewModel {
         points.append(point)
     }
 
-    // Default nil = timer expiry with no ghost position → auto fail
     func evaluateSeal(ghostScreenPosition: CGPoint? = nil) {
         stopTimer()
         guard points.count > 20 else {
@@ -149,13 +147,11 @@ final class ContainmentViewModel {
             let user_id: String
             let type: String
             let equipped: Bool
-            let effect_json: String
         }
         let row = TotemInsert(
             user_id: userId,
             type: type.rawValue,
-            equipped: false,
-            effect_json: "{}"
+            equipped: false
         )
         do {
             try await SupabaseManager.shared.client
@@ -190,16 +186,16 @@ final class ContainmentViewModel {
     }
 }
 
-// MARK: - AR Container
+// MARK: - AR Container (camera + 3D ghost)
 
 struct ARContainerView: View {
-    var proximityLevel: Double
     var onTrackingMessage: ((String?) -> Void)?
     var onGhostScreenPosition: ((CGPoint) -> Void)?
 
     var body: some View {
         ARGhostView(
-            proximityLevel: proximityLevel,
+            proximityLevel: 1.0,
+            showGhost: true,
             onTrackingMessage: onTrackingMessage,
             onGhostScreenPosition: onGhostScreenPosition
         )
@@ -211,101 +207,66 @@ struct ARContainerView: View {
 
 struct ContainmentView: View {
     let hotspot: Hotspot
-    let proximityLevel: Double
     @State private var vm: ContainmentViewModel
     @State private var arTrackingMessage: String? = "Initializing AR…"
     @State private var ghostScreenPosition: CGPoint?
     @Environment(\.dismiss) private var dismiss
 
-    private let arSupported = ARWorldTrackingConfiguration.isSupported
+    private var timerColor: Color {
+        vm.timeRemaining <= 3 ? Kit.Colors.danger : Kit.Colors.signal
+    }
 
-    init(hotspot: Hotspot, proximityLevel: Double) {
+    init(hotspot: Hotspot) {
         self.hotspot = hotspot
-        self.proximityLevel = proximityLevel
         _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
     }
 
     var body: some View {
         ZStack {
-            if arSupported {
-                ARContainerView(
-                    proximityLevel: proximityLevel,
-                    onTrackingMessage: { arTrackingMessage = $0 },
-                    onGhostScreenPosition: { ghostScreenPosition = $0 }
+            // Single ARView: real camera feed + 3D ghost model anchored to camera
+            ARContainerView(
+                onTrackingMessage: { arTrackingMessage = $0 },
+                onGhostScreenPosition: { ghostScreenPosition = $0 }
+            )
+
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+
+            VStack(spacing: 0) {
+                KitHUDHeader(
+                    module: "CONTAINMENT",
+                    title: hotspot.name,
+                    subtitle: timerSubtitle,
+                    readout: .init(
+                        label: "SEAL TIMER",
+                        value: "\(vm.timeRemaining)s",
+                        valueColor: timerColor
+                    )
                 )
-                .ignoresSafeArea()
-            } else {
-                Color.black.ignoresSafeArea()
-                GridPattern()
-                    .stroke(Color.purple.opacity(0.15), lineWidth: 1)
-                    .ignoresSafeArea()
-            }
-
-            Color.black.opacity(0.45)
-                .ignoresSafeArea()
-
-            GridPattern()
-                .stroke(Color.purple.opacity(0.1), lineWidth: 1)
-                .ignoresSafeArea()
-
-            VStack {
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("CONTAINMENT")
-                            .font(.caption).bold()
-                            .foregroundStyle(.purple)
-                        Text(hotspot.name)
-                            .font(.headline)
-                            .foregroundStyle(.white)
-                    }
-                    Spacer()
-
-                    VStack(alignment: .trailing, spacing: 2) {
-                        Text("\(vm.timeRemaining)s")
-                            .font(.title).bold()
-                            .foregroundStyle(vm.timeRemaining <= 3 ? .red : .green)
-                            .monospacedDigit()
-
-                        let bonus = InventoryViewModel.shared.effects.sealTimeBonus
-                        if bonus > 0 {
-                            Text("+\(bonus)s from totem")
-                                .font(.caption2)
-                                .foregroundStyle(.purple)
-                        }
-                    }
-                }
-                .padding()
 
                 SealCanvas(points: vm.points, ghostPosition: ghostScreenPosition) { point in
                     vm.addPoint(point)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .overlay(
-                    Text(ghostScreenPosition != nil ? "Draw a seal AROUND the ghost" : "Waiting for ghost…")
-                        .font(.caption)
-                        .foregroundStyle(.white.opacity(0.6))
-                        .padding(.bottom, 8),
-                    alignment: .bottom
-                )
-
-                Button {
-                    vm.evaluateSeal(ghostScreenPosition: ghostScreenPosition)
-                } label: {
-                    Text("SEAL")
-                        .font(.headline).bold()
-                        .foregroundStyle(.black)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(.purple)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                .overlay(alignment: .bottom) {
+                    Text(ghostScreenPosition != nil ? "DRAW A SEAL AROUND THE GHOST" : "WAITING FOR GHOST…")
+                        .font(Kit.Font.label())
+                        .foregroundStyle(Kit.Colors.muted)
+                        .tracking(Kit.Layout.labelTracking)
+                        .padding(.bottom, 12)
                 }
-                .padding()
+
+                KitPrimaryButton(title: "SEAL") {
+                    vm.evaluateSeal(ghostScreenPosition: ghostScreenPosition)
+                }
+                .padding(16)
             }
         }
         .overlay(alignment: .top) {
-            if arSupported, let message = arTrackingMessage {
+            if let message = arTrackingMessage {
                 Text(message)
-                    .font(.caption).bold()
+                    .font(Kit.Font.label())
                     .foregroundStyle(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -323,6 +284,56 @@ struct ContainmentView: View {
             }
         }
     }
+
+    private var timerSubtitle: String? {
+        let bonus = InventoryViewModel.shared.effects.sealTimeBonus
+        guard bonus > 0 else { return nil }
+        return "+\(bonus)S TOTEM BONUS"
+    }
+}
+
+// MARK: - Seal Canvas
+
+struct SealCanvas: View {
+    let points: [SealPoint]
+    let ghostPosition: CGPoint?
+    let onPoint: (SealPoint) -> Void
+
+    var body: some View {
+        Canvas { context, _ in
+            if let ghost = ghostPosition {
+                let radius: CGFloat = 24
+                let crossLen: CGFloat = 10
+                let ring = Path(ellipseIn: CGRect(
+                    x: ghost.x - radius, y: ghost.y - radius,
+                    width: radius * 2, height: radius * 2
+                ))
+                context.stroke(ring, with: .color(Kit.Colors.accent.opacity(0.7)), lineWidth: 2)
+                var cross = Path()
+                cross.move(to: CGPoint(x: ghost.x - crossLen, y: ghost.y))
+                cross.addLine(to: CGPoint(x: ghost.x + crossLen, y: ghost.y))
+                cross.move(to: CGPoint(x: ghost.x, y: ghost.y - crossLen))
+                cross.addLine(to: CGPoint(x: ghost.x, y: ghost.y + crossLen))
+                context.stroke(cross, with: .color(.white.opacity(0.8)), lineWidth: 1.5)
+            }
+
+            guard points.count > 1 else { return }
+            var path = Path()
+            path.move(to: CGPoint(x: points[0].x, y: points[0].y))
+            for point in points.dropFirst() {
+                path.addLine(to: CGPoint(x: point.x, y: point.y))
+            }
+            context.stroke(path, with: .color(Kit.Colors.accent.opacity(0.35)), lineWidth: 10)
+            context.stroke(path, with: .color(Kit.Colors.accent), lineWidth: 3)
+        }
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    onPoint(SealPoint(x: value.location.x, y: value.location.y))
+                }
+        )
+        .background(Color.clear)
+    }
 }
 
 // MARK: - Result Sheet
@@ -337,15 +348,15 @@ struct ResultSheet: View {
         VStack(spacing: 24) {
             Image(systemName: outcome == .success ? "checkmark.seal.fill" : "xmark.seal.fill")
                 .font(.system(size: 64))
-                .foregroundStyle(outcome == .success ? .green : .red)
+                .foregroundStyle(outcome == .success ? Kit.Colors.signal : Kit.Colors.danger)
 
             Text(outcome == .success ? "Ghost Contained!" : "Containment Failed")
-                .font(.title2).bold()
-                .foregroundStyle(outcome == .success ? .green : .red)
+                .font(Kit.Font.readout(22))
+                .foregroundStyle(outcome == .success ? Kit.Colors.signal : Kit.Colors.danger)
 
             Text(hotspot.name)
-                .font(.headline)
-                .foregroundStyle(.secondary)
+                .font(Kit.Font.body())
+                .foregroundStyle(Kit.Colors.label)
 
             VStack(spacing: 12) {
                 RewardRow(icon: "star.fill", label: "XP Earned", value: "+\(reward.xp) XP", color: .yellow)
@@ -361,21 +372,19 @@ struct ResultSheet: View {
                     RewardRow(icon: newTotem.icon,
                               label: "Totem Unlocked",
                               value: newTotem.displayName,
-                              color: .purple)
+                              color: Kit.Colors.accent)
                 }
             }
             .padding()
-            .background(Color.white.opacity(0.05), in: RoundedRectangle(cornerRadius: 14))
+            .background(Kit.Colors.panel, in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
             .padding(.horizontal)
 
-            Button("Continue") {
-                onDismiss()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.purple)
+            KitPrimaryButton(title: "CONTINUE", action: onDismiss)
+                .padding(.horizontal)
         }
         .padding()
         .presentationDetents([.medium])
+        .presentationBackground(Kit.Colors.background)
     }
 }
 
@@ -398,53 +407,5 @@ private struct RewardRow: View {
                 .foregroundStyle(color)
         }
         .font(.subheadline)
-    }
-}
-
-// MARK: - Seal Canvas
-
-struct SealCanvas: View {
-    let points: [SealPoint]
-    let ghostPosition: CGPoint?
-    let onPoint: (SealPoint) -> Void
-
-    var body: some View {
-        Canvas { context, _ in
-            // Draw ghost target crosshair
-            if let ghost = ghostPosition {
-                let radius: CGFloat = 24
-                let crossLen: CGFloat = 10
-                // Pulsing ring around ghost
-                let ring = Path(ellipseIn: CGRect(
-                    x: ghost.x - radius, y: ghost.y - radius,
-                    width: radius * 2, height: radius * 2
-                ))
-                context.stroke(ring, with: .color(.purple.opacity(0.7)), lineWidth: 2)
-                // Small crosshair
-                var cross = Path()
-                cross.move(to: CGPoint(x: ghost.x - crossLen, y: ghost.y))
-                cross.addLine(to: CGPoint(x: ghost.x + crossLen, y: ghost.y))
-                cross.move(to: CGPoint(x: ghost.x, y: ghost.y - crossLen))
-                cross.addLine(to: CGPoint(x: ghost.x, y: ghost.y + crossLen))
-                context.stroke(cross, with: .color(.white.opacity(0.8)), lineWidth: 1.5)
-            }
-
-            // Draw the player's seal stroke
-            guard points.count > 1 else { return }
-            var path = Path()
-            path.move(to: CGPoint(x: points[0].x, y: points[0].y))
-            for point in points.dropFirst() {
-                path.addLine(to: CGPoint(x: point.x, y: point.y))
-            }
-            context.stroke(path, with: .color(.purple), lineWidth: 3)
-            context.stroke(path, with: .color(.purple.opacity(0.3)), lineWidth: 8)
-        }
-        .gesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { value in
-                    onPoint(SealPoint(x: value.location.x, y: value.location.y))
-                }
-        )
-        .background(Color.clear)
     }
 }

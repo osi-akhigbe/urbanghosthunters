@@ -67,10 +67,9 @@ final class InventoryViewModel {
             let user_id: String
             let type: String
             let equipped: Bool
-            let effect_json: String
         }
         let starters = TotemType.allCases.map { type in
-            StarterTotem(user_id: userId.uuidString, type: type.rawValue, equipped: false, effect_json: "{}")
+            StarterTotem(user_id: userId.uuidString, type: type.rawValue, equipped: false)
         }
         do {
             totems = try await SupabaseManager.shared.client

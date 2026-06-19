@@ -36,7 +36,6 @@ struct GameTotem: Identifiable, Codable {
     let user_id: UUID
     let type: TotemType
     var equipped: Bool
-    let effect_json: [String: Double]
 }
 
 // Aggregated values applied to gameplay from all equipped totems
