@@ -58,7 +58,7 @@ struct RewardCalculator {
     // Higher difficulty gives more XP, shards, and a chance at a full totem.
     static func calculate(difficulty: Int, success: Bool) -> ContainmentReward {
         guard success else {
-            return ContainmentReward(xp: 10, totemShards: 0, newTotem: nil)
+            return ContainmentReward(xp: 0, totemShards: 0, newTotem: nil)
         }
         switch difficulty {
         case 1:  return ContainmentReward(xp: 50,  totemShards: 0, newTotem: nil)
