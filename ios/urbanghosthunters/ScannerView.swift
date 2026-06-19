@@ -8,10 +8,36 @@ import CoreLocation
 import CoreHaptics
 import UIKit
 
+// MARK: - Location delegate helper
+// Separate NSObject handles CLLocationManagerDelegate so ScannerViewModel
+// stays a plain @Observable class — avoids nonisolated + Task @MainActor
+// observation tracking issues that prevented meters from updating.
+private final class LocationDelegate: NSObject, CLLocationManagerDelegate {
+    var onLocation: ((CLLocation) -> Void)?
+    var onHeading: ((CLHeading) -> Void)?
+    var onError: ((Error) -> Void)?
+
+    func locationManager(_ manager: CLLocationManager,
+                         didUpdateLocations locations: [CLLocation]) {
+        guard let loc = locations.last else { return }
+        onLocation?(loc)
+    }
+
+    func locationManager(_ manager: CLLocationManager,
+                         didUpdateHeading newHeading: CLHeading) {
+        onHeading?(newHeading)
+    }
+
+    func locationManager(_ manager: CLLocationManager,
+                         didFailWithError error: Error) {
+        onError?(error)
+    }
+}
+
 // MARK: - ViewModel
 @Observable
 @MainActor
-final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
+final class ScannerViewModel {
     var headingAlignment: Double = 0
     var proximityLevel: Double = 0
     var headingDegrees: Double = 0
@@ -19,14 +45,54 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
     var errorText: String?
 
     private let locationManager = CLLocationManager()
+    private let locationDelegate = LocationDelegate()
     private var hapticEngine: CHHapticEngine?
     private var hapticTimer: Timer?
+    private var bgObserver: Any?
+    private var fgObserver: Any?
     let hotspot: Hotspot
 
     init(hotspot: Hotspot) {
         self.hotspot = hotspot
-        super.init()
-        locationManager.delegate = self
+
+        // CLLocationManager fires callbacks on the main thread (thread it was
+        // created on), so these closures run on the main actor safely.
+        locationDelegate.onLocation = { [weak self] loc in
+            guard let self else { return }
+            let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
+            let distance = loc.distance(from: hotspotLoc)
+            self.distanceMeters = distance
+            self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
+            self.updateHapticRate()
+            if distance > 100 {
+                self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
+                self.locationManager.distanceFilter = 10
+            } else {
+                self.locationManager.desiredAccuracy = kCLLocationAccuracyBest
+                self.locationManager.distanceFilter = 2
+            }
+        }
+
+        locationDelegate.onHeading = { [weak self] heading in
+            guard let self else { return }
+            self.headingDegrees = heading.magneticHeading
+            let bearing = self.bearingTo(
+                lat: self.hotspot.lat,
+                lng: self.hotspot.lng,
+                from: self.locationManager.location?.coordinate.latitude ?? 0,
+                userLng: self.locationManager.location?.coordinate.longitude ?? 0
+            )
+            let diff = abs(heading.magneticHeading - bearing)
+            let normalised = min(diff, 360 - diff)
+            self.headingAlignment = max(0, 1 - normalised / 45)
+            self.updateHapticRate()
+        }
+
+        locationDelegate.onError = { [weak self] error in
+            self?.errorText = error.localizedDescription
+        }
+
+        locationManager.delegate = locationDelegate
         locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
         locationManager.distanceFilter = 5
         locationManager.headingFilter = 3
@@ -34,28 +100,23 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
         locationManager.startUpdatingHeading()
         prepareHaptics()
 
-        NotificationCenter.default.addObserver(
+        bgObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.pauseSensors()
-        }
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.pauseSensors() }
 
-        NotificationCenter.default.addObserver(
+        fgObserver = NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.resumeSensors()
-        }
+            object: nil, queue: .main
+        ) { [weak self] _ in self?.resumeSensors() }
     }
 
     func stop() {
         locationManager.stopUpdatingLocation()
         locationManager.stopUpdatingHeading()
         stopHaptics()
-        NotificationCenter.default.removeObserver(self)
+        if let o = bgObserver { NotificationCenter.default.removeObserver(o) }
+        if let o = fgObserver { NotificationCenter.default.removeObserver(o) }
     }
 
     func pauseSensors() {
@@ -77,48 +138,6 @@ final class ScannerViewModel: NSObject, CLLocationManagerDelegate {
         let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLng)
         let bearing = atan2(y, x) * 180 / .pi
         return (bearing + 360).truncatingRemainder(dividingBy: 360)
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                     didUpdateLocations locations: [CLLocation]) {
-        guard let loc = locations.last else { return }
-        Task { @MainActor in
-            let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
-            let distance = loc.distance(from: hotspotLoc)
-            self.distanceMeters = distance
-            self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
-            self.updateHapticRate()
-
-            if distance > 100 {
-                manager.desiredAccuracy = kCLLocationAccuracyHundredMeters
-                manager.distanceFilter = 10
-            } else {
-                manager.desiredAccuracy = kCLLocationAccuracyBest
-                manager.distanceFilter = 2
-            }
-        }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                     didUpdateHeading newHeading: CLHeading) {
-        Task { @MainActor in
-            self.headingDegrees = newHeading.magneticHeading
-            let bearing = self.bearingTo(
-                lat: self.hotspot.lat,
-                lng: self.hotspot.lng,
-                from: self.locationManager.location?.coordinate.latitude ?? 0,
-                userLng: self.locationManager.location?.coordinate.longitude ?? 0
-            )
-            let diff = abs(newHeading.magneticHeading - bearing)
-            let normalised = min(diff, 360 - diff)
-            self.headingAlignment = max(0, 1 - normalised / 45)
-            self.updateHapticRate()
-        }
-    }
-
-    nonisolated func locationManager(_ manager: CLLocationManager,
-                                     didFailWithError error: Error) {
-        Task { @MainActor in self.errorText = error.localizedDescription }
     }
 
     func prepareHaptics() {
@@ -188,7 +207,7 @@ struct ScannerView: View {
         ZStack {
             KitScreenBackground()
 
-            GhostARView(proximityLevel: vm.proximityLevel)
+            ProximityGhostView(proximityLevel: vm.proximityLevel)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
@@ -337,5 +356,74 @@ private struct MicLureButton: View {
                         micLure.endLure()
                     }
             )
+    }
+}
+
+// MARK: - Pure SwiftUI ghost overlay (no ARView — avoids Metal conflict with ContainmentView camera)
+
+private struct ProximityGhostView: View {
+    let proximityLevel: Double
+
+    var body: some View {
+        TimelineView(.animation) { tl in
+            GhostFrame(
+                phase: tl.date.timeIntervalSinceReferenceDate,
+                proximity: proximityLevel
+            )
+        }
+    }
+}
+
+private struct GhostFrame: View {
+    let phase: Double
+    let proximity: Double
+
+    var body: some View {
+        let yFloat = sin(phase * 1.6) * 18.0
+        let s     = 0.45 + proximity * 0.65
+        let a     = proximity * 0.68
+        let c     = Color(red: 0.80, green: 0.96, blue: 1.0)
+
+        ZStack {
+            // Outer glow
+            Circle()
+                .fill(c.opacity(a * 0.25))
+                .frame(width: 220, height: 220)
+                .blur(radius: 45)
+
+            // Body
+            Ellipse()
+                .fill(c.opacity(a))
+                .frame(width: 88, height: 118)
+                .blur(radius: 12)
+
+            // Head
+            Circle()
+                .fill(c.opacity(a))
+                .frame(width: 78, height: 78)
+                .offset(y: -88)
+                .blur(radius: 10)
+
+            // Eyes
+            HStack(spacing: 22) {
+                Circle()
+                    .fill(Color(red: 0.06, green: 0.02, blue: 0.18).opacity(min(1, a * 1.5)))
+                    .frame(width: 11, height: 11)
+                Circle()
+                    .fill(Color(red: 0.06, green: 0.02, blue: 0.18).opacity(min(1, a * 1.5)))
+                    .frame(width: 11, height: 11)
+            }
+            .offset(y: -90)
+
+            // Tail wisps
+            HStack(spacing: 7) {
+                Circle().fill(c.opacity(a * 0.75)).frame(width: 30, height: 30).blur(radius: 8)
+                Circle().fill(c.opacity(a * 0.75)).frame(width: 35, height: 35).blur(radius: 8)
+                Circle().fill(c.opacity(a * 0.75)).frame(width: 30, height: 30).blur(radius: 8)
+            }
+            .offset(y: 70)
+        }
+        .scaleEffect(s)
+        .offset(y: yFloat)
     }
 }

@@ -7,6 +7,8 @@ import SwiftUI
 import Supabase
 
 struct AuthView: View {
+    var onAuthenticated: (() -> Void)? = nil
+
     @StateObject private var supa = SupabaseManager.shared
     @State private var email = ""
     @State private var otp = ""
@@ -36,50 +38,53 @@ struct AuthView: View {
                     }
                     .padding(.top, 40)
 
-                    if let uid = supa.userId {
+                    if supa.userId != nil {
+                        // Session already exists — continue without creating a new user
                         KitPanel {
-                            VStack(alignment: .leading, spacing: 8) {
-                                KitSectionLabel(text: "OPERATOR ID")
-                                Text(uid)
-                                    .font(Kit.Font.label())
-                                    .foregroundStyle(Kit.Colors.signal)
-                                    .textSelection(.enabled)
+                            VStack(spacing: 12) {
+                                KitSectionLabel(text: "SESSION ACTIVE")
+                                Text("You have an existing session. Continue to keep your progress and journal history.")
+                                    .font(Kit.Font.body())
+                                    .foregroundStyle(Kit.Colors.muted)
+                                KitPrimaryButton(title: "CONTINUE") {
+                                    onAuthenticated?()
+                                }
+                            }
+                        }
+                    } else {
+                        // No session — offer guest or email sign-in
+                        KitPanel {
+                            VStack(spacing: 16) {
+                                KitPrimaryButton(title: "CONTINUE AS GUEST") {
+                                    Task { await signInAnonymously() }
+                                }
+                                .disabled(isSigningIn)
+
+                                if isSigningIn {
+                                    KitLoadingView(message: "AUTHENTICATING…")
+                                }
+                            }
+                        }
+
+                        KitPanel {
+                            VStack(spacing: 16) {
+                                KitSectionLabel(text: "EMAIL ACCESS")
+
+                                KitTextField(label: "EMAIL", text: $email, keyboard: .emailAddress)
+
+                                if isWaitingForOTP {
+                                    KitTextField(label: "OTP CODE", text: $otp, keyboard: .numberPad)
+                                    KitPrimaryButton(title: "VERIFY OTP") {
+                                        Task { await verifyOTP() }
+                                    }
+                                } else {
+                                    KitPrimaryButton(title: "SEND OTP") {
+                                        Task { await sendOTP() }
+                                    }
+                                }
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                    }
-
-                    KitPanel {
-                        VStack(spacing: 16) {
-                            KitPrimaryButton(title: "CONTINUE AS GUEST") {
-                                Task { await signInAnonymously() }
-                            }
-                            .disabled(isSigningIn)
-
-                            if isSigningIn {
-                                KitLoadingView(message: "AUTHENTICATING…")
-                            }
-                        }
-                    }
-
-                    KitPanel {
-                        VStack(spacing: 16) {
-                            KitSectionLabel(text: "EMAIL ACCESS")
-
-                            KitTextField(label: "EMAIL", text: $email, keyboard: .emailAddress)
-
-                            if isWaitingForOTP {
-                                KitTextField(label: "OTP CODE", text: $otp, keyboard: .numberPad)
-                                KitPrimaryButton(title: "VERIFY OTP") {
-                                    Task { await verifyOTP() }
-                                }
-                            } else {
-                                KitPrimaryButton(title: "SEND OTP") {
-                                    Task { await sendOTP() }
-                                }
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
 
                     if let errorText {
@@ -99,6 +104,7 @@ struct AuthView: View {
         do {
             errorText = nil
             _ = try await supa.client.auth.signInAnonymously()
+            onAuthenticated?()
         } catch {
             errorText = error.localizedDescription
         }
@@ -124,6 +130,7 @@ struct AuthView: View {
                 token: otp,
                 type: .email
             )
+            onAuthenticated?()
         } catch {
             errorText = error.localizedDescription
         }

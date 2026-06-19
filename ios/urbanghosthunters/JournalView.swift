@@ -7,32 +7,23 @@ struct EncounterRow: Decodable, Identifiable, Hashable {
     let created_at: String?
     let outcome: String
     let rewards_json: RewardsJSON?
-    let hotspots: HotspotSummary?
 
     struct RewardsJSON: Decodable, Hashable {
         let xp: Int?
-        let totem_name: String?
-    }
-
-    struct HotspotSummary: Decodable, Hashable {
-        let name: String
-        let difficulty: Int?
-    }
-
-    var displayTitle: String {
-        hotspots?.name ?? "Unknown haunt"
+        let totem_shards: Int?
+        let totem_granted: String?
     }
 
     var formattedDate: String {
-    guard let created_at else { return "Unknown date" }
-    let iso = ISO8601DateFormatter()
-    iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-    guard let date = iso.date(from: created_at) else { return created_at }
-    let formatter = DateFormatter()
-    formatter.dateStyle = .medium
-    formatter.timeStyle = .short
-    return formatter.string(from: date)
-}
+        guard let created_at else { return "Unknown date" }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        guard let date = iso.date(from: created_at) else { return created_at }
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
 }
 
 @Observable
@@ -55,7 +46,7 @@ final class JournalViewModel {
         do {
             encounters = try await SupabaseManager.shared.client
                 .from("encounters")
-                .select("id, hotspot_id, created_at, outcome, rewards_json, hotspots(name, difficulty)")
+                .select("id, hotspot_id, created_at, outcome, rewards_json")
                 .order("created_at", ascending: false)
                 .limit(30)
                 .execute()
@@ -71,23 +62,45 @@ struct JournalView: View {
     @State private var vm = JournalViewModel()
 
     var body: some View {
-        List {
-            if vm.isLoading {
-                ProgressView("Loading encounters…")
-            } else if let error = vm.errorText {
-                Text(error).foregroundStyle(.red)
-            } else if vm.encounters.isEmpty {
-                Text("No encounters yet. Complete a containment to see results here.")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(vm.encounters) { row in
-                    NavigationLink(value: row) {
-                        JournalRowView(row: row)
+        ZStack {
+            KitScreenBackground()
+
+            Group {
+                if vm.isLoading {
+                    KitLoadingView(message: "LOADING JOURNAL…")
+                } else if let error = vm.errorText {
+                    KitEmptyState(icon: "exclamationmark.triangle",
+                                  title: "SYNC ERROR",
+                                  message: error)
+                } else if vm.encounters.isEmpty {
+                    KitEmptyState(icon: "book.closed",
+                                  title: "NO ENTRIES",
+                                  message: "Complete a containment to log your first encounter.")
+                } else {
+                    List {
+                        ForEach(vm.encounters) { row in
+                            NavigationLink(value: row) {
+                                JournalRowView(row: row)
+                            }
+                            .listRowBackground(Kit.Colors.panel)
+                        }
                     }
+                    .scrollContentBackground(.hidden)
                 }
             }
         }
-        .navigationTitle("Journal")
+        .navigationTitle("")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text("JOURNAL")
+                    .font(Kit.Font.module())
+                    .foregroundStyle(Kit.Colors.accent)
+                    .tracking(Kit.Layout.labelTracking)
+            }
+        }
+        .toolbarBackground(Kit.Colors.background, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(for: EncounterRow.self) { row in
             EncounterDetailView(encounter: row)
         }
@@ -99,27 +112,49 @@ struct JournalView: View {
 struct JournalRowView: View {
     let row: EncounterRow
 
+    private var outcomeColor: Color {
+        row.outcome == "captured" ? Kit.Colors.signal : Kit.Colors.danger
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(row.displayTitle)
-                .font(.headline)
-            Text(row.outcome.capitalized)
-                .font(.subheadline)
-                .foregroundStyle(row.outcome == "captured" ? .green : .orange)
-            HStack {
-                if let xp = row.rewards_json?.xp {
-                    Text("+\(xp) XP")
-                        .font(.caption)
-                        .foregroundStyle(.purple)
-                }
-                if let totem = row.rewards_json?.totem_name {
-                    Text("Totem: \(totem)")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+        HStack(spacing: 12) {
+            Image(systemName: row.outcome == "captured" ? "checkmark.seal.fill" : "xmark.seal.fill")
+                .font(.title2)
+                .foregroundStyle(outcomeColor)
+                .frame(width: 36)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(row.outcome == "captured" ? "Ghost Contained" : "Containment Failed")
+                    .font(Kit.Font.title())
+                    .foregroundStyle(.white)
+
+                Text(row.formattedDate)
+                    .font(Kit.Font.label())
+                    .foregroundStyle(Kit.Colors.muted)
+                    .tracking(Kit.Layout.labelTracking)
+
+                HStack(spacing: 8) {
+                    if let xp = row.rewards_json?.xp {
+                        Text("+\(xp) XP")
+                            .font(Kit.Font.label())
+                            .foregroundStyle(Kit.Colors.signal)
+                    }
+                    if let shards = row.rewards_json?.totem_shards, shards > 0 {
+                        Text("+\(shards) shards")
+                            .font(Kit.Font.label())
+                            .foregroundStyle(Kit.Colors.accent)
+                    }
+                    if let totem = row.rewards_json?.totem_granted {
+                        Text("🔮 \(totem)")
+                            .font(Kit.Font.label())
+                            .foregroundStyle(Kit.Colors.accent)
+                    }
                 }
             }
+
+            Spacer()
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
     }
 }
 
@@ -128,32 +163,39 @@ struct EncounterDetailView: View {
     @State private var replayHotspot: Hotspot?
 
     var body: some View {
-        List {
-            Section("Haunt") {
-                LabeledContent("Location", value: encounter.displayTitle)
-                if let d = encounter.hotspots?.difficulty {
-                    LabeledContent("Difficulty", value: "\(d)")
+        ZStack {
+            KitScreenBackground()
+
+            List {
+                Section("RESULT") {
+                    LabeledContent("Outcome", value: encounter.outcome.capitalized)
+                    LabeledContent("Date", value: encounter.formattedDate)
+                    if let xp = encounter.rewards_json?.xp {
+                        LabeledContent("XP Earned", value: "+\(xp)")
+                    }
+                    if let shards = encounter.rewards_json?.totem_shards, shards > 0 {
+                        LabeledContent("Totem Shards", value: "+\(shards)")
+                    }
+                    if let totem = encounter.rewards_json?.totem_granted {
+                        LabeledContent("Totem Unlocked", value: totem)
+                    }
                 }
+                .listRowBackground(Kit.Colors.panel)
+
+                Section {
+                    Button("Replay hunt at this location") {
+                        Task { await loadHotspotForReplay() }
+                    }
+                    .foregroundStyle(Kit.Colors.accent)
+                }
+                .listRowBackground(Kit.Colors.panel)
             }
-            Section("Result") {
-                LabeledContent("Outcome", value: encounter.outcome.capitalized)
-                if let xp = encounter.rewards_json?.xp {
-                    LabeledContent("XP", value: "+\(xp)")
-                }
-                if let totem = encounter.rewards_json?.totem_name {
-                    LabeledContent("Reward", value: totem)
-                }
-                if let created = encounter.created_at {
-                    LabeledContent("When", value: encounter.formattedDate)
-                }
-            }
-            Section {
-                Button("Replay hunt at this haunt") {
-                    Task { await loadHotspotForReplay() }
-                }
-            }
+            .scrollContentBackground(.hidden)
         }
-        .navigationTitle("Encounter")
+        .navigationTitle("Encounter Log")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbarBackground(Kit.Colors.background, for: .navigationBar)
+        .toolbarBackground(.visible, for: .navigationBar)
         .navigationDestination(item: $replayHotspot) { hotspot in
             ScannerView(hotspot: hotspot)
         }
@@ -171,7 +213,6 @@ struct EncounterDetailView: View {
             replayHotspot = rows.first
         } catch {
             ErrorLogger.shared.log(error, context: "EncounterDetailView.loadHotspotForReplay")
-            print("Replay load failed: \(error)")
         }
     }
 }

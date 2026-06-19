@@ -22,9 +22,6 @@ struct urbanghosthuntersApp: App {
         UITabBar.appearance().standardAppearance = tab
         UITabBar.appearance().scrollEdgeAppearance = tab
 
-        Task { @MainActor in
-            await PermissionsManager.shared.requestAll()
-        }
     }
 
     var body: some Scene {
