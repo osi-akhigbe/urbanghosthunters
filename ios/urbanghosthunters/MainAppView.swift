@@ -47,7 +47,7 @@ struct MainAppView: View {
         .task {
             geofence.start()
             await geofence.loadHotspots()
-            await PlayerInventory.shared.load()
+            await InventoryViewModel.shared.fetch()
         }
         .onChange(of: geofence.nearbyHotspot?.id) { _, _ in
             bannerDismissed = false
