@@ -9,14 +9,19 @@ import Supabase
 
 enum Secrets {
     static func string(_ key: String) -> String {
+        let fileName = AppEnvironment.current.secretsFileName
         guard
-            let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist"),
+            let url = Bundle.main.url(forResource: fileName, withExtension: "plist"),
             let data = try? Data(contentsOf: url),
             let dict = (try? PropertyListSerialization.propertyList(from: data, format: nil)) as? [String: Any],
             let value = dict[key] as? String,
             !value.isEmpty
         else {
-            fatalError("Missing \(key) in Secrets.plist")
+            fatalError(
+                "Missing '\(key)' in \(fileName).plist. " +
+                "Copy Secrets.example.plist → \(fileName).plist and fill in your " +
+                "\(AppEnvironment.current.displayName) Supabase credentials."
+            )
         }
         return value
     }
@@ -33,14 +38,6 @@ final class SupabaseManager: ObservableObject {
     private var authTask: Task<Void, Never>?
 
     private init() {
-
-    if let url = Bundle.main.url(forResource: "Secrets", withExtension: "plist") {
-    print("✅ Secrets.plist found at: \(url)")
-    } else {
-    print("❌ Secrets.plist NOT found in bundle")
-    }
-
-
         let supabaseURL = URL(string: Secrets.string("SUPABASE_URL"))!
         let supabaseKey = Secrets.string("SUPABASE_ANON_KEY")
         self.client = SupabaseClient(supabaseURL: supabaseURL, supabaseKey: supabaseKey)

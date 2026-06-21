@@ -38,8 +38,11 @@ DerivedData/
 
 # Local iOS secrets (do not commit)
 ios/**/Secrets.plist
+ios/**/Secrets.debug.plist
+ios/**/Secrets.release.plist
 Secrets.plist
-Secrets.plist
+Secrets.debug.plist
+Secrets.release.plist
 *.xcuserstate
 .DS_Store
 DerivedData/
