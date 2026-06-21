@@ -20,8 +20,16 @@
 		<string>bluetooth-central</string>
 	</array>
 	<key>NSBluetoothAlwaysUsageDescription</key>
-	<string>Urban Ghost Hunters uses Bluetooth to detect nearby agents.</string>
+	<string>Urban Ghost Hunters uses Bluetooth to detect nearby ghost-hunting agents in your area.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
-	<string>Urban Ghost Hunters uses Bluetooth to detect nearby agents.</string>
+	<string>Urban Ghost Hunters uses Bluetooth to detect nearby ghost-hunting agents in your area.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Urban Ghost Hunters uses your camera to capture photographic evidence during paranormal investigations.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Urban Ghost Hunters uses your microphone to detect audio anomalies and lure spirits during investigations.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Urban Ghost Hunters uses your location to detect nearby paranormal hotspots and guide you to investigation sites.</string>
+	<key>NFCReaderUsageDescription</key>
+	<string>Urban Ghost Hunters scans NFC totems to unlock special ghost-hunting abilities and equipment.</string>
 </dict>
 </plist>
