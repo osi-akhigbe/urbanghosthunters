@@ -439,9 +439,10 @@
 				INFOPLIST_FILE = urbanghosthunters/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = urbanghosthunters;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need camera access to capture evidence during investigations.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to detect nearby paranormal hotspots.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to record audio evidence.";
+				INFOPLIST_KEY_NFCReaderUsageDescription = "Urban Ghost Hunters scans NFC totems to unlock special ghost-hunting abilities and equipment.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Urban Ghost Hunters uses your camera to capture photographic evidence during paranormal investigations.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Urban Ghost Hunters uses your location to detect nearby paranormal hotspots and guide you to investigation sites.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Urban Ghost Hunters uses your microphone to detect audio anomalies and lure spirits during investigations.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -477,9 +478,10 @@
 				INFOPLIST_FILE = urbanghosthunters/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = urbanghosthunters;
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.adventure-games";
-				INFOPLIST_KEY_NSCameraUsageDescription = "We need camera access to capture evidence during investigations.";
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We need your location to detect nearby paranormal hotspots.";
-				INFOPLIST_KEY_NSMicrophoneUsageDescription = "We need microphone access to record audio evidence.";
+				INFOPLIST_KEY_NFCReaderUsageDescription = "Urban Ghost Hunters scans NFC totems to unlock special ghost-hunting abilities and equipment.";
+				INFOPLIST_KEY_NSCameraUsageDescription = "Urban Ghost Hunters uses your camera to capture photographic evidence during paranormal investigations.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Urban Ghost Hunters uses your location to detect nearby paranormal hotspots and guide you to investigation sites.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Urban Ghost Hunters uses your microphone to detect audio anomalies and lure spirits during investigations.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
