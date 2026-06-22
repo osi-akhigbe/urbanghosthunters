@@ -1,23 +1,26 @@
 import SwiftUI
+import Supabase
 
 struct MainAppView: View {
-    @StateObject private var supa     = SupabaseManager.shared
     @StateObject private var geofence = GeofenceManager.shared
-
     @State private var bannerDismissed = false
 
     var body: some View {
         ZStack(alignment: .top) {
             TabView {
-                MapView()
-                    .tabItem {
-                        Label("Map", systemImage: "map.fill")
-                    }
+                NavigationStack {
+                    MapView()
+                }
+                .tabItem {
+                    Label("Map", systemImage: "map.fill")
+                }
 
-                JournalPlaceholderView()
-                    .tabItem {
-                        Label("Journal", systemImage: "book.fill")
-                    }
+                NavigationStack {
+                    JournalView()
+                }
+                .tabItem {
+                    Label("Journal", systemImage: "book.fill")
+                }
 
                 InventoryView()
                     .tabItem {
@@ -28,8 +31,8 @@ struct MainAppView: View {
 
             if let hotspot = geofence.nearbyHotspot, !bannerDismissed {
                 AnomalyBannerView(
-                    hotspot:   hotspot,
-                    distance:  geofence.distanceMeters,
+                    hotspot: hotspot,
+                    distance: geofence.distanceMeters,
                     direction: geofence.directionLabel,
                     onDismiss: {
                         withAnimation {
@@ -41,10 +44,12 @@ struct MainAppView: View {
             }
         }
         .kitScreen()
-        .onAppear {
+        .task {
             geofence.start()
+            await geofence.loadHotspots()
+            await InventoryViewModel.shared.fetch()
         }
-        .onChange(of: geofence.nearbyHotspot?.id) { _ in
+        .onChange(of: geofence.nearbyHotspot?.id) { _, _ in
             bannerDismissed = false
         }
     }

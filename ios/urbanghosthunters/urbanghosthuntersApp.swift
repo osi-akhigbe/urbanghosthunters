@@ -4,6 +4,7 @@
 //
 
 import SwiftUI
+import Supabase
 
 @main
 struct urbanghosthuntersApp: App {
@@ -21,15 +22,17 @@ struct urbanghosthuntersApp: App {
         UITabBar.appearance().standardAppearance = tab
         UITabBar.appearance().scrollEdgeAppearance = tab
 
-        Task { @MainActor in
-            await PermissionsManager.shared.requestAll()
-        }
     }
 
     var body: some Scene {
         WindowGroup {
             ContentView()
                 .tint(Kit.Colors.accent)
+                .onOpenURL { url in
+                    Task {
+                        try? await SupabaseManager.shared.client.auth.session(from: url)
+                    }
+                }
         }
     }
 }

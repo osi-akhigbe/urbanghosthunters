@@ -16,6 +16,7 @@ enum ContainmentOutcome {
 final class ContainmentViewModel {
     var points: [SealPoint] = []
     var outcome: ContainmentOutcome = .inProgress
+    var reward: ContainmentReward?
     var showResult: Bool = false
 
     private var timer: Timer?
@@ -52,33 +53,62 @@ final class ContainmentViewModel {
         points.append(point)
     }
 
-    func evaluateSeal() {
+    func evaluateSeal(ghostScreenPosition: CGPoint? = nil) {
         stopTimer()
         guard points.count > 20 else {
             outcome = .failed
+            reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: false)
             showResult = true
             return
         }
 
         guard let first = points.first, let last = points.last else {
             outcome = .failed
+            reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: false)
             showResult = true
             return
         }
 
         let dx = first.x - last.x
         let dy = first.y - last.y
-        let distance = sqrt(dx * dx + dy * dy)
+        let closed = sqrt(dx * dx + dy * dy) < 60
 
-        outcome = distance < 60 ? .success : .failed
+        let ghostCaptured: Bool
+        if let ghostPos = ghostScreenPosition {
+            ghostCaptured = sealContains(ghostPos)
+        } else {
+            ghostCaptured = false
+        }
+
+        let success = closed && ghostCaptured
+        outcome = success ? .success : .failed
+        reward = RewardCalculator.calculate(difficulty: hotspot.difficulty, success: success)
         showResult = true
         playResultHaptic()
 
         Task { await saveEncounter() }
     }
 
+    private func sealContains(_ point: CGPoint) -> Bool {
+        guard points.count > 5 else { return false }
+        var path = Path()
+        path.move(to: CGPoint(x: points[0].x, y: points[0].y))
+        for p in points.dropFirst() {
+            path.addLine(to: CGPoint(x: p.x, y: p.y))
+        }
+        path.closeSubpath()
+        return path.contains(point)
+    }
+
     func saveEncounter() async {
-        guard let userId = SupabaseManager.shared.userId else { return }
+        guard let userId = SupabaseManager.shared.userId,
+              let reward else { return }
+
+        struct RewardsJSON: Encodable {
+            let xp: Int
+            let totem_shards: Int
+            let totem_granted: String?
+        }
 
         struct EncounterInsert: Encodable {
             let user_id: String
@@ -87,16 +117,15 @@ final class ContainmentViewModel {
             let rewards_json: RewardsJSON
         }
 
-        struct RewardsJSON: Encodable {
-            let xp: Int
-        }
-
-        let xp = outcome == .success ? 100 : 10
         let insert = EncounterInsert(
             user_id: userId,
             hotspot_id: hotspot.id,
             outcome: outcome == .success ? "captured" : "failed",
-            rewards_json: RewardsJSON(xp: xp)
+            rewards_json: RewardsJSON(
+                xp: reward.xp,
+                totem_shards: reward.totemShards,
+                totem_granted: reward.newTotem?.rawValue
+            )
         )
 
         do {
@@ -106,6 +135,32 @@ final class ContainmentViewModel {
                 .execute()
         } catch {
             print("Failed to save encounter: \(error)")
+        }
+
+        if let newTotemType = reward.newTotem {
+            await grantTotem(type: newTotemType, userId: userId)
+        }
+    }
+
+    private func grantTotem(type: TotemType, userId: String) async {
+        struct TotemInsert: Encodable {
+            let user_id: String
+            let type: String
+            let equipped: Bool
+        }
+        let row = TotemInsert(
+            user_id: userId,
+            type: type.rawValue,
+            equipped: false
+        )
+        do {
+            try await SupabaseManager.shared.client
+                .from("totems")
+                .insert(row)
+                .execute()
+            await InventoryViewModel.shared.fetch()
+        } catch {
+            print("Failed to grant totem: \(error)")
         }
     }
 
@@ -131,9 +186,30 @@ final class ContainmentViewModel {
     }
 }
 
+// MARK: - AR Container (camera + 3D ghost)
+
+struct ARContainerView: View {
+    var onTrackingMessage: ((String?) -> Void)?
+    var onGhostScreenPosition: ((CGPoint) -> Void)?
+
+    var body: some View {
+        ARGhostView(
+            proximityLevel: 1.0,
+            showGhost: true,
+            onTrackingMessage: onTrackingMessage,
+            onGhostScreenPosition: onGhostScreenPosition
+        )
+        .ignoresSafeArea()
+    }
+}
+
+// MARK: - Containment View
+
 struct ContainmentView: View {
     let hotspot: Hotspot
     @State private var vm: ContainmentViewModel
+    @State private var arTrackingMessage: String? = "Initializing AR…"
+    @State private var ghostScreenPosition: CGPoint?
     @Environment(\.dismiss) private var dismiss
 
     private var timerColor: Color {
@@ -147,7 +223,14 @@ struct ContainmentView: View {
 
     var body: some View {
         ZStack {
-            KitScreenBackground()
+            // Single ARView: real camera feed + 3D ghost model anchored to camera
+            ARContainerView(
+                onTrackingMessage: { arTrackingMessage = $0 },
+                onGhostScreenPosition: { ghostScreenPosition = $0 }
+            )
+
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 KitHUDHeader(
@@ -161,13 +244,13 @@ struct ContainmentView: View {
                     )
                 )
 
-                SealCanvas(points: vm.points) { point in
+                SealCanvas(points: vm.points, ghostPosition: ghostScreenPosition) { point in
                     vm.addPoint(point)
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .padding(.horizontal, 16)
                 .overlay(alignment: .bottom) {
-                    Text("DRAW A SEAL TO CONTAIN THE GHOST")
+                    Text(ghostScreenPosition != nil ? "DRAW A SEAL AROUND THE GHOST" : "WAITING FOR GHOST…")
                         .font(Kit.Font.label())
                         .foregroundStyle(Kit.Colors.muted)
                         .tracking(Kit.Layout.labelTracking)
@@ -175,23 +258,29 @@ struct ContainmentView: View {
                 }
 
                 KitPrimaryButton(title: "SEAL") {
-                    vm.evaluateSeal()
+                    vm.evaluateSeal(ghostScreenPosition: ghostScreenPosition)
                 }
                 .padding(16)
             }
         }
-        .kitScreen()
+        .overlay(alignment: .top) {
+            if let message = arTrackingMessage {
+                Text(message)
+                    .font(Kit.Font.label())
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(.black.opacity(0.6), in: Capsule())
+                    .padding(.top, 60)
+            }
+        }
         .onAppear { vm.startTimer() }
         .onDisappear { vm.stopTimer() }
         .sheet(isPresented: $vm.showResult) {
-            KitOutcomeSheet(
-                success: vm.outcome == .success,
-                title: vm.outcome == .success ? "GHOST CONTAINED" : "CONTAINMENT FAILED",
-                subtitle: hotspot.name,
-                reward: vm.outcome == .success ? "+100 XP" : "+10 XP",
-                buttonTitle: "CONTINUE"
-            ) {
-                dismiss()
+            if let reward = vm.reward {
+                ResultSheet(outcome: vm.outcome, hotspot: hotspot, reward: reward) {
+                    dismiss()
+                }
             }
         }
     }
@@ -203,12 +292,31 @@ struct ContainmentView: View {
     }
 }
 
+// MARK: - Seal Canvas
+
 struct SealCanvas: View {
     let points: [SealPoint]
+    let ghostPosition: CGPoint?
     let onPoint: (SealPoint) -> Void
 
     var body: some View {
         Canvas { context, _ in
+            if let ghost = ghostPosition {
+                let radius: CGFloat = 24
+                let crossLen: CGFloat = 10
+                let ring = Path(ellipseIn: CGRect(
+                    x: ghost.x - radius, y: ghost.y - radius,
+                    width: radius * 2, height: radius * 2
+                ))
+                context.stroke(ring, with: .color(Kit.Colors.accent.opacity(0.7)), lineWidth: 2)
+                var cross = Path()
+                cross.move(to: CGPoint(x: ghost.x - crossLen, y: ghost.y))
+                cross.addLine(to: CGPoint(x: ghost.x + crossLen, y: ghost.y))
+                cross.move(to: CGPoint(x: ghost.x, y: ghost.y - crossLen))
+                cross.addLine(to: CGPoint(x: ghost.x, y: ghost.y + crossLen))
+                context.stroke(cross, with: .color(.white.opacity(0.8)), lineWidth: 1.5)
+            }
+
             guard points.count > 1 else { return }
             var path = Path()
             path.move(to: CGPoint(x: points[0].x, y: points[0].y))
@@ -218,34 +326,86 @@ struct SealCanvas: View {
             context.stroke(path, with: .color(Kit.Colors.accent.opacity(0.35)), lineWidth: 10)
             context.stroke(path, with: .color(Kit.Colors.accent), lineWidth: 3)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Kit.Colors.panel, in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
-        .overlay(
-            RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
-                .stroke(Kit.Colors.panelBorder, lineWidth: 1)
-        )
         .gesture(
             DragGesture(minimumDistance: 0)
                 .onChanged { value in
                     onPoint(SealPoint(x: value.location.x, y: value.location.y))
                 }
         )
+        .background(Color.clear)
     }
 }
+
+// MARK: - Result Sheet
 
 struct ResultSheet: View {
     let outcome: ContainmentOutcome
     let hotspot: Hotspot
+    let reward: ContainmentReward
     let onDismiss: () -> Void
 
     var body: some View {
-        KitOutcomeSheet(
-            success: outcome == .success,
-            title: outcome == .success ? "GHOST CONTAINED" : "CONTAINMENT FAILED",
-            subtitle: hotspot.name,
-            reward: outcome == .success ? "+100 XP" : "+10 XP",
-            buttonTitle: "CONTINUE",
-            onDismiss: onDismiss
-        )
+        VStack(spacing: 24) {
+            Image(systemName: outcome == .success ? "checkmark.seal.fill" : "xmark.seal.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(outcome == .success ? Kit.Colors.signal : Kit.Colors.danger)
+
+            Text(outcome == .success ? "Ghost Contained!" : "Containment Failed")
+                .font(Kit.Font.readout(22))
+                .foregroundStyle(outcome == .success ? Kit.Colors.signal : Kit.Colors.danger)
+
+            Text(hotspot.name)
+                .font(Kit.Font.body())
+                .foregroundStyle(Kit.Colors.label)
+
+            VStack(spacing: 12) {
+                RewardRow(icon: "star.fill", label: "XP Earned", value: "+\(reward.xp) XP", color: .yellow)
+
+                if reward.totemShards > 0 {
+                    RewardRow(icon: "seal.fill",
+                              label: "Totem Shards",
+                              value: "+\(reward.totemShards)",
+                              color: .cyan)
+                }
+
+                if let newTotem = reward.newTotem {
+                    RewardRow(icon: newTotem.icon,
+                              label: "Totem Unlocked",
+                              value: newTotem.displayName,
+                              color: Kit.Colors.accent)
+                }
+            }
+            .padding()
+            .background(Kit.Colors.panel, in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius))
+            .padding(.horizontal)
+
+            KitPrimaryButton(title: "CONTINUE", action: onDismiss)
+                .padding(.horizontal)
+        }
+        .padding()
+        .presentationDetents([.medium])
+        .presentationBackground(Kit.Colors.background)
+    }
+}
+
+private struct RewardRow: View {
+    let icon: String
+    let label: String
+    let value: String
+    let color: Color
+
+    var body: some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(color)
+                .frame(width: 24)
+            Text(label)
+                .foregroundStyle(.white)
+            Spacer()
+            Text(value)
+                .bold()
+                .foregroundStyle(color)
+        }
+        .font(.subheadline)
     }
 }

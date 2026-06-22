@@ -8,7 +8,8 @@ import MapKit
 import Observation
 import Supabase
 
-struct Hotspot: Identifiable, Decodable {
+// MARK: - Hotspot model
+struct Hotspot: Identifiable, Decodable, Hashable {
     let id: UUID
     let name: String
     let lat: Double
@@ -89,6 +90,7 @@ final class MapViewModel: NSObject, CLLocationManagerDelegate {
 struct MapView: View {
     @State private var vm = MapViewModel()
     @State private var position: MapCameraPosition = .userLocation(fallback: .automatic)
+    @State private var selectedHotspot: Hotspot?
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -97,11 +99,16 @@ struct MapView: View {
 
                 ForEach(vm.hotspots) { hotspot in
                     Annotation(hotspot.name, coordinate: hotspot.coordinate) {
-                        Image(systemName: "rays")
-                            .foregroundStyle(Kit.Colors.accent)
-                            .padding(8)
-                            .background(Kit.Colors.background.opacity(0.85), in: Circle())
-                            .overlay(Circle().stroke(Kit.Colors.accent.opacity(0.5), lineWidth: 1))
+                        Button {
+                            selectedHotspot = hotspot
+                        } label: {
+                            Image(systemName: "rays")
+                                .foregroundStyle(Kit.Colors.accent)
+                                .padding(8)
+                                .background(Kit.Colors.background.opacity(0.85), in: Circle())
+                                .overlay(Circle().stroke(Kit.Colors.accent.opacity(0.5), lineWidth: 1))
+                        }
+                        .buttonStyle(.plain)
                     }
                 }
             }
@@ -110,6 +117,19 @@ struct MapView: View {
                 MapCompass()
             }
             .ignoresSafeArea()
+            .navigationDestination(item: $selectedHotspot) { hotspot in
+                ScannerView(hotspot: hotspot)
+            }
+
+            if vm.hotspots.isEmpty, vm.errorText == nil {
+                Text("No hotspots loaded. Run docs/supabase-demo-setup.sql in Supabase, then refresh.")
+                    .font(.footnote)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.white)
+                    .padding()
+                    .background(.black.opacity(0.7), in: RoundedRectangle(cornerRadius: 12))
+                    .padding()
+            }
 
             if vm.isLoading {
                 VStack {
@@ -123,9 +143,20 @@ struct MapView: View {
                 NearestAnomalySheet(hotspot: nearest)
                     .padding(.horizontal, 16)
                     .padding(.bottom, 8)
+                    .contentShape(Rectangle())
+                    .onTapGesture {
+                        selectedHotspot = nearest
+                    }
+            } else if !vm.hotspots.isEmpty {
+                Text("Tap a marker or move closer to an anomaly")
+                    .font(.caption)
+                    .foregroundStyle(Kit.Colors.muted)
+                    .padding(8)
+                    .background(.ultraThinMaterial, in: Capsule())
+                    .padding(.bottom, 24)
             }
 
-            if let error = vm.errorText {
+            if let error = vm.errorText, !error.isEmpty {
                 VStack {
                     Spacer()
                     KitBanner(style: .error, title: "MAP ERROR", message: error)

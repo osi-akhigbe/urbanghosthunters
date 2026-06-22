@@ -1,5 +1,6 @@
 -- Totems: equippable items that modify gameplay mechanics
-CREATE TABLE IF NOT EXISTS totems (
+DROP TABLE IF EXISTS totems CASCADE;
+CREATE TABLE totems (
     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id     UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
     type        TEXT NOT NULL CHECK (type IN ('seal_stability', 'reveal_window', 'flash_cooldown')),

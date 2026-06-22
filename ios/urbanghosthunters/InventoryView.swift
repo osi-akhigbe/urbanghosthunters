@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InventoryView: View {
     @State private var vm = InventoryViewModel.shared
+    @State private var showNFCScanner = false
 
     var body: some View {
         NavigationStack {
@@ -40,16 +41,28 @@ struct InventoryView: View {
                         .foregroundStyle(Kit.Colors.accent)
                         .tracking(Kit.Layout.labelTracking)
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showNFCScanner = true
+                    } label: {
+                        Image(systemName: "wave.3.right.circle")
+                            .foregroundStyle(Kit.Colors.accent)
+                    }
+                    .accessibilityLabel("Scan NFC Totem")
+                }
             }
             .toolbarBackground(Kit.Colors.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .sheet(isPresented: $showNFCScanner) {
+                NFCScannerView()
+            }
         }
         .task { await vm.fetch() }
     }
 }
 
 private struct EquippedSlotsSection: View {
-    let equipped: [Totem]
+    let equipped: [GameTotem]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -95,8 +108,8 @@ private struct EquippedSlot: View {
 }
 
 private struct TotemListSection: View {
-    let totems: [Totem]
-    let onTap: (Totem) -> Void
+    let totems: [GameTotem]
+    let onTap: (GameTotem) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -119,7 +132,7 @@ private struct TotemListSection: View {
 }
 
 private struct TotemRow: View {
-    let totem: Totem
+    let totem: GameTotem
     let onTap: () -> Void
 
     var body: some View {
