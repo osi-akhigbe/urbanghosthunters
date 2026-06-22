@@ -183,6 +183,8 @@ struct ScannerView: View {
     @State private var showContainment = false
     @State private var audioStatic = AudioStaticManager()
     @State private var showCoop = false
+    @State private var flashlight = FlashlightManager.shared
+    @State private var ambient = AmbientLightMonitor.shared
     @Environment(\.dismiss) private var dismiss
 
     private var containmentThreshold: Double {
@@ -309,10 +311,14 @@ struct ScannerView: View {
             ToolbarItem(placement: .topBarLeading) {
                 KitGhostButton(title: "← EXIT") { dismiss() }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                FlashlightButton(manager: flashlight, isLowLight: ambient.isLowLight)
+            }
         }
         .onAppear {
             micLure.prepare()
             audioStatic.prepare()
+            ambient.start()
         }
         .onChange(of: vm.proximityLevel) { _, newValue in
             audioStatic.setProximity(newValue)
@@ -321,6 +327,8 @@ struct ScannerView: View {
             vm.stop()
             micLure.stop()
             audioStatic.stop()
+            ambient.stop()
+            flashlight.turnOff()
         }
     }
 }

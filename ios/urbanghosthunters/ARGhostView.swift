@@ -120,8 +120,13 @@ struct ARGhostView: UIViewRepresentable {
             e.scale = scale
             root.addChild(e)
         }
+<<<<<<< HEAD
 
         part(.generateSphere(radius: 0.15),  mat: bodyMat, pos: SIMD3(0, 0.28, 0))
+=======
+        // individual bodyparts of the ghost model
+        part(.generateSphere(radius: 0.15), mat: bodyMat, pos: SIMD3(0, 0.28, 0))
+>>>>>>> b4328a9040b9a0e024e416ba71635b657413c613
         part(.generateSphere(radius: 0.135), mat: bodyMat,
              pos: SIMD3(0, 0.05, 0), scale: SIMD3(1.0, 1.7, 0.88))
         part(.generateSphere(radius: 0.060), mat: bodyMat, pos: SIMD3(-0.09, -0.22, 0))
@@ -173,7 +178,7 @@ struct ARGhostView: UIViewRepresentable {
             let pulse = 0.08 * sin(animPhase * 2.5) * currentProximity
             let level = currentProximity + pulse
             root.components.set(OpacityComponent(opacity: level * 0.9))
-            root.scale = SIMD3(repeating: 0.6 + level * 0.9)
+            root.scale = SIMD3(repeating: 0.6 + level * 0.9)  // overall size of th ghost model
 
             // Project to screen for the seal mechanic
             let worldPos = root.position(relativeTo: nil)
