@@ -50,6 +50,7 @@ class GhostARSessionDelegate: NSObject, ARSessionDelegate {
 struct ARGhostView: UIViewRepresentable {
     var proximityLevel: Double
     var showGhost: Bool = true
+    var skin: GhostSkin = .classic
     var onTrackingMessage: ((String?) -> Void)?
     var onGhostScreenPosition: ((CGPoint) -> Void)?
 
@@ -71,16 +72,16 @@ struct ARGhostView: UIViewRepresentable {
         arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
 
         if showGhost {
-            // Camera-relative anchor so the ghost never drifts off-screen
             let cameraAnchor = AnchorEntity(.camera)
             arView.scene.addAnchor(cameraAnchor)
 
-            let ghostRoot = buildGhost()
-            // Position 1.5m in front of camera, slightly below eye level
+            let ghostRoot = buildGhost(skin: skin)
             ghostRoot.position = SIMD3(0, -0.18, -1.5)
             cameraAnchor.addChild(ghostRoot)
 
             context.coordinator.ghostRoot = ghostRoot
+            context.coordinator.cameraAnchor = cameraAnchor
+            context.coordinator.currentSkin = skin
             context.coordinator.startAnimation(arView: arView,
                                                onScreenPos: onGhostScreenPosition)
         }
@@ -96,19 +97,19 @@ struct ARGhostView: UIViewRepresentable {
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.currentProximity = Float(max(0, min(1, proximityLevel)))
         context.coordinator.onScreenPos = onGhostScreenPosition
+        context.coordinator.updateSkinIfNeeded(skin, build: buildGhost)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
-    // MARK: Procedural ghost model (same design as GhostARView)
-    private func buildGhost() -> Entity {
+    private func buildGhost(skin: GhostSkin) -> Entity {
         let root = Entity()
 
         var bodyMat = UnlitMaterial()
-        bodyMat.color = .init(tint: UIColor(red: 0.80, green: 0.96, blue: 1.00, alpha: 1.0))
+        bodyMat.color = .init(tint: skin.bodyUIColor)
 
         var eyeMat = UnlitMaterial()
-        eyeMat.color = .init(tint: UIColor(red: 0.06, green: 0.02, blue: 0.18, alpha: 1.0))
+        eyeMat.color = .init(tint: skin.eyeUIColor)
 
         func part(_ mesh: MeshResource,
                   mat: UnlitMaterial,
@@ -120,14 +121,14 @@ struct ARGhostView: UIViewRepresentable {
             root.addChild(e)
         }
 
-        part(.generateSphere(radius: 0.15), mat: bodyMat, pos: SIMD3(0, 0.28, 0))
+        part(.generateSphere(radius: 0.15),  mat: bodyMat, pos: SIMD3(0, 0.28, 0))
         part(.generateSphere(radius: 0.135), mat: bodyMat,
              pos: SIMD3(0, 0.05, 0), scale: SIMD3(1.0, 1.7, 0.88))
         part(.generateSphere(radius: 0.060), mat: bodyMat, pos: SIMD3(-0.09, -0.22, 0))
         part(.generateSphere(radius: 0.065), mat: bodyMat, pos: SIMD3(  0.0, -0.28, 0))
         part(.generateSphere(radius: 0.060), mat: bodyMat, pos: SIMD3( 0.09, -0.22, 0))
-        part(.generateSphere(radius: 0.038), mat: eyeMat, pos: SIMD3(-0.055, 0.30, 0.12))
-        part(.generateSphere(radius: 0.038), mat: eyeMat, pos: SIMD3( 0.055, 0.30, 0.12))
+        part(.generateSphere(radius: 0.038), mat: eyeMat,  pos: SIMD3(-0.055, 0.30, 0.12))
+        part(.generateSphere(radius: 0.038), mat: eyeMat,  pos: SIMD3( 0.055, 0.30, 0.12))
 
         return root
     }
@@ -135,12 +136,24 @@ struct ARGhostView: UIViewRepresentable {
     // MARK: - Coordinator
     class Coordinator {
         var ghostRoot: Entity?
+        var cameraAnchor: AnchorEntity?
         var arView: ARView?
         var currentProximity: Float = 1.0
+        var currentSkin: GhostSkin = .classic
         var onScreenPos: ((CGPoint) -> Void)?
         var animPhase: Float = 0
         var timer: Timer?
         let sessionDelegate = GhostARSessionDelegate()
+
+        func updateSkinIfNeeded(_ skin: GhostSkin, build: (GhostSkin) -> Entity) {
+            guard skin != currentSkin, let anchor = cameraAnchor else { return }
+            if let old = ghostRoot { anchor.removeChild(old) }
+            let newRoot = build(skin)
+            newRoot.position = SIMD3(0, -0.18, -1.5)
+            anchor.addChild(newRoot)
+            ghostRoot = newRoot
+            currentSkin = skin
+        }
 
         func startAnimation(arView: ARView, onScreenPos: ((CGPoint) -> Void)?) {
             self.onScreenPos = onScreenPos

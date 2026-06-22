@@ -196,6 +196,7 @@ struct ARContainerView: View {
         ARGhostView(
             proximityLevel: 1.0,
             showGhost: true,
+            skin: GhostSkinManager.shared.activeSkin,
             onTrackingMessage: onTrackingMessage,
             onGhostScreenPosition: onGhostScreenPosition
         )
