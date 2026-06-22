@@ -7,36 +7,7 @@ import SwiftUI
 import ARKit
 import RealityKit
 
-// MARK: - Ghost Skin (colour theme, tied to difficulty)
-enum GhostSkin: String, CaseIterable, Identifiable {
-    case classic   = "Classic"
-    case spiderMan = "Spider-Man"
-    case batman    = "Batman"
-    case pumpkin   = "Pumpkin"
-    case alien     = "Alien"
-
-    var id: String { rawValue }
-
-    var bodyColor: UIColor {
-        switch self {
-        case .classic:   return UIColor(red: 0.91, green: 0.93, blue: 0.99, alpha: 1)
-        case .spiderMan: return UIColor(red: 0.84, green: 0.08, blue: 0.12, alpha: 1)
-        case .batman:    return UIColor(red: 0.17, green: 0.17, blue: 0.20, alpha: 1)
-        case .pumpkin:   return UIColor(red: 0.95, green: 0.52, blue: 0.08, alpha: 1)
-        case .alien:     return UIColor(red: 0.25, green: 0.88, blue: 0.38, alpha: 1)
-        }
-    }
-
-    var eyeColor: UIColor { UIColor(white: 0.04, alpha: 1) }
-
-    var accentColor: UIColor? {
-        switch self {
-        case .spiderMan: return UIColor(red: 0.08, green: 0.18, blue: 0.72, alpha: 1)
-        case .batman:    return UIColor(red: 0.95, green: 0.82, blue: 0.00, alpha: 1)
-        default:         return nil
-        }
-    }
-}
+// GhostSkin enum lives in GhostSkin.swift (added by remote team)
 
 // MARK: - Ghost Personality (shape + expression, randomised per encounter)
 struct GhostPersonality {
@@ -75,17 +46,17 @@ func makeGhostEntity(skin: GhostSkin,
                      personality p: GhostPersonality) -> (root: Entity, bottomParts: [AnimatedPart]) {
     let root = Entity()
 
-    // Body: PhysicallyBasedMaterial gives the soft matte shading from the reference images
+    // Body: PhysicallyBasedMaterial — soft matte shading that reacts to AR lighting
     var bodyMat = PhysicallyBasedMaterial()
-    bodyMat.baseColor = PhysicallyBasedMaterial.BaseColor(tint: skin.bodyColor)
+    bodyMat.baseColor = PhysicallyBasedMaterial.BaseColor(tint: skin.bodyUIColor)
     bodyMat.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.88)
     bodyMat.metallic  = PhysicallyBasedMaterial.Metallic(floatLiteral: 0.00)
 
-    // Face: UnlitMaterial so eyes/mouth are always true-black regardless of lighting
+    // Face: UnlitMaterial so eyes/mouth stay true-black regardless of lighting
     var faceMat = UnlitMaterial()
-    faceMat.color = .init(tint: skin.eyeColor)
+    faceMat.color = .init(tint: skin.eyeUIColor)
 
-    // Dark hollow (open underside of the sheet)
+    // Dark hollow — simulates the open underside of the draped sheet
     var hollowMat = UnlitMaterial()
     hollowMat.color = .init(tint: UIColor(white: 0.03, alpha: 1))
 
@@ -101,14 +72,11 @@ func makeGhostEntity(skin: GhostSkin,
     }
 
     // ── HEAD DOME ─────────────────────────────────────────────────
-    // Single large sphere — dominant visual element, slightly front-flattened
     addBody(.generateSphere(radius: 0.200),
             pos: SIMD3(0, 0.190, 0),
             scale: SIMD3(1.00, 1.00, 0.82))
 
     // ── BODY — bell that widens below the head ─────────────────────
-    // Two overlapping ellipsoids seamlessly merge with the head above
-    // and flare into the hem below, creating a bedsheet silhouette.
     addBody(.generateSphere(radius: 0.190),
             pos: SIMD3(0, -0.030, 0),
             scale: SIMD3(p.bodyWidthScale * 1.18, 1.70, 0.78))
@@ -126,17 +94,15 @@ func makeGhostEntity(skin: GhostSkin,
     // ── SCALLOPED HEM — N softly-rounded lobes in a sine arc ───────
     let hemSpan: Float = 0.208 * p.bodyWidthScale
     var bottomParts: [AnimatedPart] = []
-
     for i in 0..<p.waveCount {
         let t        = p.waveCount > 1 ? Float(i) / Float(p.waveCount - 1) : 0.5
         let x        = -hemSpan + t * hemSpan * 2.0
         let waveY    = p.waveAmplitude * sin(t * .pi * Float(p.waveCount - 1) + p.wavePhase)
-        let edgeFade = 1.0 - abs(t - 0.5) * 0.32    // outer lobes slightly smaller
+        let edgeFade = 1.0 - abs(t - 0.5) * 0.32
         let r: Float = 0.075 * Float(edgeFade)
         let yScale   = Float(1.42 * edgeFade + 0.08)
-
-        let lobe = ModelEntity(mesh: .generateSphere(radius: r), materials: [bodyMat])
-        let base = SIMD3<Float>(x, -0.296 + waveY, 0)
+        let lobe     = ModelEntity(mesh: .generateSphere(radius: r), materials: [bodyMat])
+        let base     = SIMD3<Float>(x, -0.296 + waveY, 0)
         lobe.position = base
         lobe.scale    = SIMD3(0.80, yScale, 0.62)
         root.addChild(lobe)
@@ -148,22 +114,20 @@ func makeGhostEntity(skin: GhostSkin,
     let eyeZ: Float = 0.148
     let eyeX: Float = 0.060
 
-    // Shape: x/y scale determines oval vs round vs wide almond
     let (eyeXScale, eyeYScale, eyeRadius): (Float, Float, Float) = {
         switch (p.eyeShape, p.expression) {
-        case (_, .startled): return (1.05, 1.18, 0.043)  // wide-open surprise
-        case (.oval,  _):    return (0.80, 1.20, 0.038)  // classic tall oval
-        case (.round, _):    return (1.00, 1.00, 0.040)  // perfect circle
-        case (.wide,  _):    return (1.38, 0.70, 0.038)  // wide almond
+        case (_, .startled): return (1.05, 1.18, 0.043)
+        case (.oval,  _):    return (0.80, 1.20, 0.038)
+        case (.round, _):    return (1.00, 1.00, 0.040)
+        case (.wide,  _):    return (1.38, 0.70, 0.038)
         }
     }()
 
-    // Tilt: rotating the oval sphere around Z tilts the eye's angle
     let eyeTilt: Float = {
         switch p.expression {
-        case .menacing:  return  .pi * 0.22   // inner corners up = scowl
-        case .friendly:  return -.pi * 0.14   // inner corners down = kind
-        default:         return 0
+        case .menacing: return  .pi * 0.22
+        case .friendly: return -.pi * 0.14
+        default:        return 0
         }
     }()
 
@@ -177,89 +141,20 @@ func makeGhostEntity(skin: GhostSkin,
                            scale: SIMD3(eyeXScale, eyeYScale, 0.46))
     rightEye.orientation = simd_quatf(angle: -eyeTilt, axis: SIMD3(0, 0, 1))
 
-    // ── MOUTH (optional, expression-driven) ────────────────────────
+    // ── MOUTH (optional) ───────────────────────────────────────────
     let showMouth = p.hasMouth || p.expression == .startled || p.expression == .menacing
     if showMouth {
         let (mxScale, myScale): (Float, Float) = {
             switch p.expression {
-            case .startled: return (1.15, 1.10)  // round O
-            case .menacing: return (1.95, 0.46)  // flat grimace
-            case .friendly: return (1.58, 0.56)  // gentle smile width
+            case .startled: return (1.15, 1.10)
+            case .menacing: return (1.95, 0.46)
+            case .friendly: return (1.58, 0.56)
             default:        return (1.12, 0.72)
             }
         }()
         addFace(.generateSphere(radius: 0.026),
                 pos: SIMD3(0, eyeY - 0.088, eyeZ),
                 scale: SIMD3(mxScale, myScale, 0.40))
-    }
-
-    // ── SKIN EXTRAS ────────────────────────────────────────────────
-    var accentMat = PhysicallyBasedMaterial()
-    if let accent = skin.accentColor {
-        accentMat.baseColor = PhysicallyBasedMaterial.BaseColor(tint: accent)
-        accentMat.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.70)
-        accentMat.metallic  = PhysicallyBasedMaterial.Metallic(floatLiteral: 0.00)
-    }
-
-    switch skin {
-
-    case .batman:
-        // Two bat ears flanking the top of the head
-        for xOff: Float in [-0.115, 0.115] {
-            let ear = ModelEntity(mesh: .generateSphere(radius: 0.036), materials: [bodyMat])
-            ear.position = SIMD3(xOff, 0.400, -0.008)
-            ear.scale    = SIMD3(0.36, 2.30, 0.36)
-            root.addChild(ear)
-        }
-        // Yellow utility-belt stripe
-        if skin.accentColor != nil {
-            let belt = ModelEntity(mesh: .generateSphere(radius: 0.080), materials: [accentMat])
-            belt.position = SIMD3(0, -0.058, 0.076)
-            belt.scale    = SIMD3(1.50, 0.13, 0.40)
-            root.addChild(belt)
-        }
-
-    case .spiderMan:
-        if skin.accentColor != nil {
-            for xOff: Float in [-0.158, 0.158] {
-                let panel = ModelEntity(mesh: .generateSphere(radius: 0.088), materials: [accentMat])
-                panel.position = SIMD3(xOff, 0.015, 0)
-                panel.scale    = SIMD3(0.46, 2.20, 0.58)
-                root.addChild(panel)
-            }
-        }
-
-    case .pumpkin:
-        let darkOrange = UIColor(red: 0.50, green: 0.20, blue: 0.02, alpha: 1)
-        var ribMat = PhysicallyBasedMaterial()
-        ribMat.baseColor = .init(tint: darkOrange)
-        ribMat.roughness = PhysicallyBasedMaterial.Roughness(floatLiteral: 0.92)
-        ribMat.metallic  = PhysicallyBasedMaterial.Metallic(floatLiteral: 0.00)
-        for xOff: Float in [-0.13, 0.0, 0.13] {
-            let rib = ModelEntity(mesh: .generateSphere(radius: 0.020), materials: [ribMat])
-            rib.position = SIMD3(xOff, 0.015, 0.138)
-            rib.scale    = SIMD3(0.40, 7.8, 0.40)
-            root.addChild(rib)
-        }
-        let stem = ModelEntity(mesh: .generateCylinder(height: 0.060, radius: 0.014), materials: [ribMat])
-        stem.position = SIMD3(0.006, 0.400, 0)
-        root.addChild(stem)
-
-    case .alien:
-        var bulbMat = UnlitMaterial()
-        bulbMat.color = .init(tint: skin.eyeColor)
-        for xOff: Float in [-0.088, 0.088] {
-            let stalk = ModelEntity(mesh: .generateSphere(radius: 0.016), materials: [bodyMat])
-            stalk.position = SIMD3(xOff, 0.452, 0.004)
-            stalk.scale    = SIMD3(0.34, 2.65, 0.34)
-            root.addChild(stalk)
-            let bulb = ModelEntity(mesh: .generateSphere(radius: 0.024), materials: [bulbMat])
-            bulb.position = SIMD3(xOff, 0.542, 0.004)
-            root.addChild(bulb)
-        }
-
-    default:
-        break
     }
 
     return (root, bottomParts)
@@ -308,8 +203,8 @@ struct ARGhostView: UIViewRepresentable {
         ]
 
         let config = ARWorldTrackingConfiguration()
-        config.planeDetection        = []
-        config.environmentTexturing  = .automatic   // enables realistic ambient shading on PBR
+        config.planeDetection       = []
+        config.environmentTexturing = .automatic
 
         arView.session.delegate = context.coordinator.sessionDelegate
         arView.session.run(config, options: [.resetTracking, .removeExistingAnchors])
@@ -323,8 +218,10 @@ struct ARGhostView: UIViewRepresentable {
             ghostRoot.position = SIMD3(0, -0.15, -1.5)
             cameraAnchor.addChild(ghostRoot)
 
-            context.coordinator.ghostRoot   = ghostRoot
-            context.coordinator.bottomParts = bottomParts
+            context.coordinator.ghostRoot    = ghostRoot
+            context.coordinator.cameraAnchor = cameraAnchor
+            context.coordinator.bottomParts  = bottomParts
+            context.coordinator.currentSkin  = skin
             context.coordinator.startAnimation(arView: arView, onScreenPos: onGhostScreenPosition)
         }
 
@@ -339,23 +236,36 @@ struct ARGhostView: UIViewRepresentable {
     func updateUIView(_ uiView: ARView, context: Context) {
         context.coordinator.currentProximity = Float(max(0, min(1, proximityLevel)))
         context.coordinator.onScreenPos = onGhostScreenPosition
+        context.coordinator.updateSkinIfNeeded(skin)
     }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     // MARK: - Coordinator
     class Coordinator {
-        // Personality is fixed once at creation — never changes mid-encounter
         let personality = GhostPersonality.random()
 
         var ghostRoot: Entity?
+        var cameraAnchor: AnchorEntity?
         var arView: ARView?
         var currentProximity: Float = 1.0
+        var currentSkin: GhostSkin = .classic
         var onScreenPos: ((CGPoint) -> Void)?
         var animPhase: Float = 0
         var timer: Timer?
         var bottomParts: [AnimatedPart] = []
         let sessionDelegate = GhostARSessionDelegate()
+
+        func updateSkinIfNeeded(_ skin: GhostSkin) {
+            guard skin != currentSkin, let anchor = cameraAnchor else { return }
+            if let old = ghostRoot { anchor.removeChild(old) }
+            let (newRoot, newParts) = makeGhostEntity(skin: skin, personality: personality)
+            newRoot.position = SIMD3(0, -0.15, -1.5)
+            anchor.addChild(newRoot)
+            ghostRoot    = newRoot
+            bottomParts  = newParts
+            currentSkin  = skin
+        }
 
         func startAnimation(arView: ARView, onScreenPos: ((CGPoint) -> Void)?) {
             self.onScreenPos = onScreenPos
@@ -368,22 +278,18 @@ struct ARGhostView: UIViewRepresentable {
             guard let root = ghostRoot, let arView else { return }
             animPhase += Float(1.0 / 60.0) * 1.3
 
-            // Float bob
             root.position.y = -0.15 + sin(animPhase) * 0.068
 
-            // Cloth-like lateral tilt (roll) + lazy yaw — feels like drifting, not spinning
             let roll = sin(animPhase * 0.52) * 0.070
             let yaw  = sin(animPhase * 0.31) * 0.036
-            root.orientation = simd_quatf(angle: yaw, axis: SIMD3(0, 1, 0))
+            root.orientation = simd_quatf(angle: yaw,  axis: SIMD3(0, 1, 0))
                              * simd_quatf(angle: roll, axis: SIMD3(0, 0, 1))
 
-            // Opacity / scale pulse with proximity
             let pulse = 0.055 * sin(animPhase * 2.1) * currentProximity
             let level = max(0.15, currentProximity + pulse)
             root.components.set(OpacityComponent(opacity: level * 0.93))
             root.scale = SIMD3(repeating: 0.78 + level * 0.13)
 
-            // Hem wave — outer lobes swing more than the centre (physically natural)
             let n = Float(bottomParts.count)
             for (i, part) in bottomParts.enumerated() {
                 let offset   = Float(i) * (.pi * 2.0 / n)
@@ -397,7 +303,6 @@ struct ARGhostView: UIViewRepresentable {
                 )
             }
 
-            // Project for seal mechanic
             let worldPos = root.position(relativeTo: nil)
             if let screenPos = arView.project(worldPos) {
                 DispatchQueue.main.async { [weak self] in

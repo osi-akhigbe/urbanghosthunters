@@ -2,6 +2,7 @@ import SwiftUI
 
 struct InventoryView: View {
     @State private var vm = InventoryViewModel.shared
+    @State private var showNFCScanner = false
 
     var body: some View {
         NavigationStack {
@@ -17,6 +18,7 @@ struct InventoryView: View {
                             TotemListSection(totems: vm.totems, onTap: { totem in
                                 Task { await vm.toggleEquip(totem) }
                             })
+                            SkinPickerSection()
                         }
                         .padding(16)
                     }
@@ -40,9 +42,21 @@ struct InventoryView: View {
                         .foregroundStyle(Kit.Colors.accent)
                         .tracking(Kit.Layout.labelTracking)
                 }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button {
+                        showNFCScanner = true
+                    } label: {
+                        Image(systemName: "wave.3.right.circle")
+                            .foregroundStyle(Kit.Colors.accent)
+                    }
+                    .accessibilityLabel("Scan NFC Totem")
+                }
             }
             .toolbarBackground(Kit.Colors.background, for: .navigationBar)
             .toolbarBackground(.visible, for: .navigationBar)
+            .sheet(isPresented: $showNFCScanner) {
+                NFCScannerView()
+            }
         }
         .task { await vm.fetch() }
     }
@@ -160,6 +174,83 @@ private struct TotemRow: View {
             .overlay(
                 RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
                     .stroke(Kit.Colors.panelBorder, lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Ghost Skin Picker
+
+private struct SkinPickerSection: View {
+    @State private var skinManager = GhostSkinManager.shared
+
+    private let columns = [GridItem(.flexible()), GridItem(.flexible())]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            KitSectionLabel(text: "GHOST SKINS")
+
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(GhostSkin.allCases) { skin in
+                    SkinCard(skin: skin, isActive: skinManager.activeSkin == skin) {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            skinManager.activeSkin = skin
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private struct SkinCard: View {
+    let skin: GhostSkin
+    let isActive: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(spacing: 10) {
+                ZStack {
+                    Circle()
+                        .fill(skin.tint.opacity(0.18))
+                        .frame(width: 56, height: 56)
+
+                    Circle()
+                        .fill(skin.tint.opacity(0.6))
+                        .frame(width: 36, height: 36)
+                        .blur(radius: 4)
+
+                    Image(systemName: skin.icon)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(skin.tint)
+                }
+
+                VStack(spacing: 3) {
+                    Text(skin.displayName)
+                        .font(Kit.Font.title())
+                        .foregroundStyle(isActive ? skin.tint : .white)
+
+                    Text(skin.description)
+                        .font(Kit.Font.label())
+                        .foregroundStyle(Kit.Colors.muted)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity)
+            .background(
+                isActive ? skin.tint.opacity(0.10) : Kit.Colors.panel,
+                in: RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Kit.Layout.cornerRadius)
+                    .stroke(
+                        isActive ? skin.tint : Kit.Colors.panelBorder,
+                        lineWidth: isActive ? 2 : 1
+                    )
             )
         }
         .buttonStyle(.plain)

@@ -56,7 +56,7 @@ struct SplashView: View {
                 .ignoresSafeArea()
 
             // 3D ghost floating behind the logo — non-AR, almost transparent
-            GhostARView(proximityLevel: 0.75)
+            GhostARView(proximityLevel: 0.75, skin: GhostSkinManager.shared.activeSkin)
                 .frame(width: 210, height: 290)
                 .opacity(0.28)
                 .allowsHitTesting(false)
