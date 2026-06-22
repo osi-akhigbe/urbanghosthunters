@@ -62,7 +62,7 @@ final class ScannerViewModel {
             let hotspotLoc = CLLocation(latitude: self.hotspot.lat, longitude: self.hotspot.lng)
             let distance = loc.distance(from: hotspotLoc)
             self.distanceMeters = distance
-            self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 190))
+            self.proximityLevel = max(0, min(1, 1 - (distance - 10) / 4990))
             self.updateHapticRate()
             if distance > 100 {
                 self.locationManager.desiredAccuracy = kCLLocationAccuracyHundredMeters
@@ -209,7 +209,8 @@ struct ScannerView: View {
         ZStack {
             KitScreenBackground()
 
-            ProximityGhostView(proximityLevel: vm.proximityLevel)
+            ProximityGhostView(proximityLevel: vm.proximityLevel,
+                               skin: GhostSkinManager.shared.activeSkin)
                 .ignoresSafeArea()
                 .allowsHitTesting(false)
 
@@ -371,12 +372,14 @@ private struct MicLureButton: View {
 
 private struct ProximityGhostView: View {
     let proximityLevel: Double
+    let skin: GhostSkin
 
     var body: some View {
         TimelineView(.animation) { tl in
             GhostFrame(
                 phase: tl.date.timeIntervalSinceReferenceDate,
-                proximity: proximityLevel
+                proximity: proximityLevel,
+                skin: skin
             )
         }
     }
@@ -385,45 +388,42 @@ private struct ProximityGhostView: View {
 private struct GhostFrame: View {
     let phase: Double
     let proximity: Double
+    let skin: GhostSkin
 
     var body: some View {
         let yFloat = sin(phase * 1.6) * 18.0
         let s     = 0.45 + proximity * 0.65
         let a     = proximity * 0.68
-        let c     = Color(red: 0.80, green: 0.96, blue: 1.0)
+        let c     = skin.tint
+        let eye   = Color(skin.eyeUIColor)
 
         ZStack {
-            // Outer glow
             Circle()
                 .fill(c.opacity(a * 0.25))
                 .frame(width: 220, height: 220)
                 .blur(radius: 45)
 
-            // Body
             Ellipse()
                 .fill(c.opacity(a))
                 .frame(width: 88, height: 118)
                 .blur(radius: 12)
 
-            // Head
             Circle()
                 .fill(c.opacity(a))
                 .frame(width: 78, height: 78)
                 .offset(y: -88)
                 .blur(radius: 10)
 
-            // Eyes
             HStack(spacing: 22) {
                 Circle()
-                    .fill(Color(red: 0.06, green: 0.02, blue: 0.18).opacity(min(1, a * 1.5)))
+                    .fill(eye.opacity(min(1, a * 1.5)))
                     .frame(width: 11, height: 11)
                 Circle()
-                    .fill(Color(red: 0.06, green: 0.02, blue: 0.18).opacity(min(1, a * 1.5)))
+                    .fill(eye.opacity(min(1, a * 1.5)))
                     .frame(width: 11, height: 11)
             }
             .offset(y: -90)
 
-            // Tail wisps
             HStack(spacing: 7) {
                 Circle().fill(c.opacity(a * 0.75)).frame(width: 30, height: 30).blur(radius: 8)
                 Circle().fill(c.opacity(a * 0.75)).frame(width: 35, height: 35).blur(radius: 8)
