@@ -120,13 +120,8 @@ struct ARGhostView: UIViewRepresentable {
             e.scale = scale
             root.addChild(e)
         }
-<<<<<<< HEAD
-
-        part(.generateSphere(radius: 0.15),  mat: bodyMat, pos: SIMD3(0, 0.28, 0))
-=======
         // individual bodyparts of the ghost model
         part(.generateSphere(radius: 0.15), mat: bodyMat, pos: SIMD3(0, 0.28, 0))
->>>>>>> b4328a9040b9a0e024e416ba71635b657413c613
         part(.generateSphere(radius: 0.135), mat: bodyMat,
              pos: SIMD3(0, 0.05, 0), scale: SIMD3(1.0, 1.7, 0.88))
         part(.generateSphere(radius: 0.060), mat: bodyMat, pos: SIMD3(-0.09, -0.22, 0))
