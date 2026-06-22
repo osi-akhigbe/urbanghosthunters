@@ -4,6 +4,7 @@ import Supabase
 struct MainAppView: View {
     @StateObject private var geofence = GeofenceManager.shared
     @State private var bannerDismissed = false
+    @State private var showGhostPreview = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -44,6 +45,20 @@ struct MainAppView: View {
             }
         }
         .kitScreen()
+        .overlay(alignment: .bottomTrailing) {
+            // DEBUG — remove before shipping
+            Button {
+                showGhostPreview = true
+            } label: {
+                Image(systemName: "eye.circle.fill")
+                    .font(.title2)
+                    .foregroundStyle(Kit.Colors.accent)
+                    .padding(20)
+            }
+        }
+        .fullScreenCover(isPresented: $showGhostPreview) {
+            GhostPreviewView()
+        }
         .task {
             geofence.start()
             await geofence.loadHotspots()

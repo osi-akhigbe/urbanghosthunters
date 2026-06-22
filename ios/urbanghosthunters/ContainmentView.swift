@@ -189,6 +189,7 @@ final class ContainmentViewModel {
 // MARK: - AR Container (camera + 3D ghost)
 
 struct ARContainerView: View {
+    var skin: GhostSkin = .classic
     var onTrackingMessage: ((String?) -> Void)?
     var onGhostScreenPosition: ((CGPoint) -> Void)?
 
@@ -196,6 +197,7 @@ struct ARContainerView: View {
         ARGhostView(
             proximityLevel: 1.0,
             showGhost: true,
+            skin: skin,
             onTrackingMessage: onTrackingMessage,
             onGhostScreenPosition: onGhostScreenPosition
         )
@@ -216,6 +218,16 @@ struct ContainmentView: View {
         vm.timeRemaining <= 3 ? Kit.Colors.danger : Kit.Colors.signal
     }
 
+    private var ghostSkin: GhostSkin {
+        switch hotspot.difficulty {
+        case 1:  return .classic
+        case 2:  return .pumpkin
+        case 3:  return .spiderMan
+        case 4:  return .batman
+        default: return .alien
+        }
+    }
+
     init(hotspot: Hotspot) {
         self.hotspot = hotspot
         _vm = State(initialValue: ContainmentViewModel(hotspot: hotspot))
@@ -225,6 +237,7 @@ struct ContainmentView: View {
         ZStack {
             // Single ARView: real camera feed + 3D ghost model anchored to camera
             ARContainerView(
+                skin: ghostSkin,
                 onTrackingMessage: { arTrackingMessage = $0 },
                 onGhostScreenPosition: { ghostScreenPosition = $0 }
             )
